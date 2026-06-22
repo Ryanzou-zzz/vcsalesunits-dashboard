@@ -1,0 +1,1704 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VC销售监控看板</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:#f0f2f5;color:#1a1a2e;min-height:100vh}
+
+/* ===== PASSWORD GATE ===== */
+#pwGate{position:fixed;inset:0;z-index:9999;background:linear-gradient(135deg,#1e3a8a,#1e40af,#1d4ed8);display:flex;align-items:center;justify-content:center}
+#pwGate.hidden{display:none}
+.pw-box{background:#fff;border-radius:16px;padding:40px 44px;width:360px;box-shadow:0 20px 60px rgba(0,0,0,.3);text-align:center}
+.pw-logo{font-size:32px;margin-bottom:8px}
+.pw-title{font-size:18px;font-weight:700;color:#1e3a8a;margin-bottom:4px}
+.pw-sub{font-size:12px;color:#6b7280;margin-bottom:28px}
+.pw-input{width:100%;padding:12px 16px;border:2px solid #e5e7eb;border-radius:10px;font-size:15px;outline:none;text-align:center;letter-spacing:2px;transition:border .2s}
+.pw-input:focus{border-color:#2563eb}
+.pw-btn{margin-top:16px;width:100%;padding:12px;background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;transition:opacity .2s}
+.pw-btn:hover{opacity:.9}
+.pw-err{color:#dc2626;font-size:12px;margin-top:10px;min-height:18px}
+.pw-hint{font-size:11px;color:#9ca3af;margin-top:20px}
+:root{
+  --blue:#2563eb;--blue-light:#dbeafe;--green:#16a34a;--green-light:#dcfce7;
+  --red:#dc2626;--red-light:#fee2e2;--orange:#d97706;--orange-light:#fef3c7;
+  --gray:#6b7280;--gray-light:#f9fafb;--border:#e5e7eb;--white:#fff;
+  --shadow:0 1px 3px rgba(0,0,0,.08),0 1px 2px rgba(0,0,0,.06);
+  --shadow-md:0 4px 6px rgba(0,0,0,.07),0 2px 4px rgba(0,0,0,.06);
+}
+/* HEADER */
+header{background:linear-gradient(135deg,#1e3a8a,#2563eb);color:#fff;padding:14px 24px;display:flex;align-items:center;gap:16px;box-shadow:0 2px 8px rgba(37,99,235,.3)}
+header h1{font-size:18px;font-weight:700;letter-spacing:.5px;flex:1}
+header .sub{font-size:12px;opacity:.75;margin-top:2px}
+.upload-btn{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:#fff;padding:7px 16px;border-radius:8px;cursor:pointer;font-size:13px;display:flex;align-items:center;gap:6px;transition:all .2s}
+.upload-btn:hover{background:rgba(255,255,255,.25)}
+.upload-btn svg{width:15px;height:15px}
+#fileInput{display:none}
+.data-info{font-size:12px;opacity:.7;text-align:right}
+
+/* FILTER BAR */
+.filter-bar{background:#fff;border-bottom:1px solid var(--border);padding:12px 24px;display:flex;flex-wrap:wrap;gap:16px;align-items:center}
+.filter-group{display:flex;align-items:center;gap:8px}
+.filter-label{font-size:12px;color:var(--gray);font-weight:600;white-space:nowrap}
+.toggle-btn{padding:4px 12px;border:1px solid var(--border);border-radius:20px;background:#fff;font-size:12px;cursor:pointer;transition:all .15s;color:#374151}
+.toggle-btn.active{background:var(--blue);border-color:var(--blue);color:#fff;font-weight:600}
+.toggle-btn:hover:not(.active){background:var(--blue-light);border-color:var(--blue)}
+.date-input{border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:12px;color:#374151;outline:none}
+.date-input:focus{border-color:var(--blue)}
+
+/* ASIN DROPDOWN */
+.asin-dropdown{position:relative}
+.asin-trigger{border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer;background:#fff;min-width:160px;display:flex;justify-content:space-between;align-items:center;gap:6px;color:#374151}
+.asin-trigger:hover{border-color:var(--blue)}
+.asin-panel{display:none;position:absolute;top:100%;left:0;z-index:100;background:#fff;border:1px solid var(--border);border-radius:8px;box-shadow:var(--shadow-md);width:280px;max-height:300px;overflow-y:auto;margin-top:4px}
+.asin-panel.open{display:block}
+.asin-search{width:100%;padding:8px 10px;border:none;border-bottom:1px solid var(--border);font-size:12px;outline:none}
+.asin-item{padding:7px 12px;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:8px}
+.asin-item:hover{background:var(--gray-light)}
+.asin-item input{accent-color:var(--blue)}
+.asin-item-label{flex:1}
+.asin-item-brand{font-size:10px;color:var(--gray);margin-left:auto}
+
+/* QUICK DATE BUTTONS */
+.quick-dates{display:flex;gap:4px;flex-wrap:wrap}
+.qd-btn{padding:4px 10px;border:1px solid var(--border);border-radius:20px;background:#fff;font-size:11px;cursor:pointer;color:#374151;white-space:nowrap;transition:all .15s}
+.qd-btn:hover{background:var(--blue-light);border-color:var(--blue);color:var(--blue)}
+.qd-btn.active{background:var(--blue);border-color:var(--blue);color:#fff;font-weight:600}
+
+/* ANOMALY DETAIL PANEL */
+.anomaly-detail{background:#f8faff;border:1px solid var(--blue-light);border-radius:10px;padding:16px;margin-top:12px;display:none}
+.anomaly-detail.show{display:block}
+.anomaly-detail-title{font-size:13px;font-weight:700;color:var(--blue);margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.detail-chart-wrap{height:200px;position:relative}
+
+/* CLICKABLE STAT CARD */
+.anomaly-stat{cursor:pointer;transition:transform .15s,box-shadow .15s}
+.anomaly-stat:hover{transform:translateY(-2px);box-shadow:var(--shadow-md)}
+.anomaly-stat.selected{outline:2px solid var(--blue);outline-offset:2px}
+
+/* COMPARE IMPROVEMENTS */
+.compare-quick{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.compare-quick-btn{padding:5px 12px;border:1px solid var(--border);border-radius:6px;background:#fff;font-size:12px;cursor:pointer;color:#374151}
+.compare-quick-btn:hover{background:var(--blue-light);border-color:var(--blue);color:var(--blue)}
+.compare-mover{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
+.mover-card{background:#fff;border-radius:10px;padding:14px;box-shadow:var(--shadow)}
+.mover-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}
+.mover-item{display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid #f3f4f6;font-size:12px}
+.mover-item:last-child{border-bottom:none}
+
+/* RESET / QUERY BUTTONS */
+.reset-btn{padding:6px 14px;border:1px solid var(--border);border-radius:6px;background:#fff;font-size:12px;cursor:pointer;color:var(--gray)}
+.reset-btn:hover{background:var(--red-light);color:var(--red);border-color:var(--red)}
+.query-btn{padding:6px 18px;border:none;border-radius:6px;background:var(--blue);color:#fff;font-size:12px;font-weight:700;cursor:pointer;box-shadow:0 2px 6px rgba(37,99,235,.35);transition:background .15s}
+.query-btn:hover{background:#1d4ed8}
+
+/* MULTI-SELECT DROPDOWN (brand / site / model) */
+.multi-dd{position:relative}
+.multi-trigger{border:1px solid var(--border);border-radius:6px;padding:5px 10px;font-size:12px;cursor:pointer;background:#fff;min-width:120px;display:flex;justify-content:space-between;align-items:center;gap:6px;color:#374151;white-space:nowrap;user-select:none}
+.multi-trigger:hover,.multi-trigger.open{border-color:var(--blue)}
+.multi-trigger .arrow{transition:transform .2s;font-size:10px}
+.multi-trigger.open .arrow{transform:rotate(180deg)}
+.multi-panel{display:none;position:absolute;top:calc(100% + 4px);left:0;z-index:200;background:#fff;border:1px solid var(--border);border-radius:8px;box-shadow:var(--shadow-md);min-width:160px;max-height:260px;overflow-y:auto}
+.multi-panel.open{display:block}
+.multi-search{width:100%;padding:7px 10px;border:none;border-bottom:1px solid var(--border);font-size:12px;outline:none}
+.multi-item{padding:7px 12px;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:8px}
+.multi-item:hover{background:var(--gray-light)}
+.multi-item input[type=checkbox]{accent-color:var(--blue);width:14px;height:14px;cursor:pointer}
+.multi-item-label{flex:1}
+.multi-divider{height:1px;background:var(--border);margin:2px 0}
+.filter-hint{font-size:11px;color:var(--orange);font-weight:600;padding:4px 8px;background:var(--orange-light);border-radius:4px;margin-left:8px;display:none}
+.filter-hint.show{display:inline}
+
+/* KPI ROW */
+.kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;padding:16px 24px}
+.kpi-card{background:#fff;border-radius:12px;padding:16px 20px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:4px}
+.kpi-label{font-size:12px;color:var(--gray);font-weight:500}
+.kpi-value{font-size:26px;font-weight:700;color:#111827}
+.kpi-sub{font-size:12px;color:var(--gray)}
+.kpi-badge{display:inline-flex;align-items:center;gap:3px;font-size:11px;padding:2px 8px;border-radius:10px;font-weight:600}
+.kpi-badge.up{background:var(--green-light);color:var(--green)}
+.kpi-badge.down{background:var(--red-light);color:var(--red)}
+.kpi-badge.neutral{background:#f3f4f6;color:var(--gray)}
+
+/* TABS */
+.tabs-wrap{padding:0 24px 24px}
+.tab-nav{display:flex;gap:4px;margin-bottom:16px;border-bottom:2px solid var(--border)}
+.tab-btn{padding:10px 20px;font-size:13px;font-weight:600;color:var(--gray);cursor:pointer;border:none;background:none;border-bottom:3px solid transparent;margin-bottom:-2px;transition:all .2s}
+.tab-btn.active{color:var(--blue);border-bottom-color:var(--blue)}
+.tab-btn:hover:not(.active){color:#374151}
+.tab-pane{display:none}
+.tab-pane.active{display:block}
+
+/* CARDS */
+.card{background:#fff;border-radius:12px;padding:20px;box-shadow:var(--shadow);margin-bottom:16px}
+.card-title{font-size:14px;font-weight:700;color:#111827;margin-bottom:16px;display:flex;align-items:center;gap:8px}
+.card-title-badge{font-size:11px;font-weight:500;color:var(--gray);background:#f3f4f6;padding:2px 8px;border-radius:10px}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.chart-container{position:relative;height:280px}
+.chart-container.tall{height:340px}
+
+/* TABLES */
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;padding:9px 12px;font-size:11px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;border-bottom:2px solid var(--border);background:#f9fafb}
+td{padding:9px 12px;border-bottom:1px solid var(--border);color:#374151}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:#f9fafb}
+.badge{display:inline-flex;align-items:center;font-size:11px;padding:2px 8px;border-radius:10px;font-weight:600}
+.badge-green{background:var(--green-light);color:var(--green)}
+.badge-red{background:var(--red-light);color:var(--red)}
+.badge-orange{background:var(--orange-light);color:var(--orange)}
+.badge-gray{background:#f3f4f6;color:var(--gray)}
+.badge-blue{background:var(--blue-light);color:var(--blue)}
+.num{text-align:right;font-variant-numeric:tabular-nums}
+.change-up{color:var(--green);font-weight:600}
+.change-down{color:var(--red);font-weight:600}
+.change-neu{color:var(--gray)}
+
+/* ANOMALY */
+.anomaly-summary{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+.anomaly-stat{background:#fff;border-radius:10px;padding:12px 16px;box-shadow:var(--shadow);flex:1;min-width:120px}
+.anomaly-stat-val{font-size:22px;font-weight:700}
+.anomaly-stat-lbl{font-size:11px;color:var(--gray);margin-top:2px}
+.anom-red .anomaly-stat-val{color:var(--red)}
+.anom-green .anomaly-stat-val{color:var(--green)}
+.anom-orange .anomaly-stat-val{color:var(--orange)}
+
+/* PERIOD COMPARE */
+.period-selectors{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px}
+.period-card{background:#fff;border-radius:10px;padding:14px;box-shadow:var(--shadow);border-top:3px solid #ccc}
+.period-card:nth-child(1){border-color:#2563eb}
+.period-card:nth-child(2){border-color:#7c3aed}
+.period-card:nth-child(3){border-color:#d97706}
+.period-name{font-size:12px;font-weight:700;margin-bottom:8px}
+.period-name:nth-child(1){color:#2563eb}
+.period-dates{display:flex;gap:6px;align-items:center;font-size:12px}
+.compare-btn{background:var(--blue);color:#fff;border:none;padding:10px 24px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;margin-bottom:16px}
+.compare-btn:hover{background:#1d4ed8}
+
+/* LEGEND DOTS */
+.legend-dot{width:10px;height:10px;border-radius:50%;display:inline-block;margin-right:4px}
+
+/* EMPTY STATE */
+.empty{text-align:center;padding:40px;color:var(--gray)}
+.empty-icon{font-size:40px;margin-bottom:8px}
+
+/* SCROLLABLE TABLE WRAPPER */
+.table-scroll{overflow-x:auto}
+
+/* TAG */
+.site-tag{display:inline-block;padding:1px 6px;border-radius:4px;font-size:10px;font-weight:600;margin-right:2px}
+.tag-DE{background:#dbeafe;color:#1d4ed8}
+.tag-FR{background:#dcfce7;color:#15803d}
+.tag-IT{background:#fee2e2;color:#b91c1c}
+.tag-ES{background:#fef9c3;color:#92400e}
+.tag-US{background:#f3e8ff;color:#6b21a8}
+
+/* TOP ASIN TABLE */
+.rank-num{font-size:11px;color:var(--gray);font-weight:700;width:24px}
+.bar-cell{display:flex;align-items:center;gap:8px}
+.mini-bar{height:8px;border-radius:4px;background:var(--blue);min-width:2px}
+
+@media(max-width:900px){
+  .kpi-row{grid-template-columns:repeat(2,1fr)}
+  .grid-2{grid-template-columns:1fr}
+  .period-selectors{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<!-- ===== PASSWORD GATE ===== -->
+<div id="pwGate">
+  <div class="pw-box">
+    <div class="pw-logo">⚡</div>
+    <div class="pw-title">VC 销售监控看板</div>
+    <div class="pw-sub">请输入访问密码</div>
+    <input class="pw-input" id="pwInput" type="password" placeholder="••••••••••••"
+      onkeydown="if(event.key==='Enter')checkPw()">
+    <button class="pw-btn" onclick="checkPw()">进入看板</button>
+    <div class="pw-err" id="pwErr"></div>
+    <div class="pw-hint">授权人员专用 · 如需访问权限请联系管理员</div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const HASH = '6cc0fbbd9db2019759dacb05ee30cac8a1f630e53c01cad72de0704ee275ca30';
+  const SK = 'vc_auth_ok';
+  // Already authenticated this session?
+  if (sessionStorage.getItem(SK) === HASH) {
+    document.getElementById('pwGate').classList.add('hidden');
+  }
+  window.checkPw = async function() {
+    const val = document.getElementById('pwInput').value;
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(val));
+    const hex = Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+    if (hex === HASH) {
+      sessionStorage.setItem(SK, HASH);
+      document.getElementById('pwGate').classList.add('hidden');
+      document.getElementById('pwInput').value = '';
+    } else {
+      const err = document.getElementById('pwErr');
+      err.textContent = '密码错误，请重试';
+      document.getElementById('pwInput').value = '';
+      document.getElementById('pwInput').focus();
+      setTimeout(()=>err.textContent='', 2500);
+    }
+  };
+})();
+</script>
+
+<header>
+  <div style="flex:1">
+    <h1>⚡ 欧洲美国 VC 销售监控看板</h1>
+    <div class="sub" id="dataRangeInfo">数据周期加载中...</div>
+  </div>
+  <div class="data-info" id="lastUpdateInfo"></div>
+  <button class="upload-btn" onclick="document.getElementById('fileInput').click()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+    上传Excel更新数据
+  </button>
+  <input type="file" id="fileInput" accept=".xlsx,.xls" onchange="handleUpload(this)">
+</header>
+
+<div class="filter-bar">
+  <!-- 品牌 -->
+  <div class="filter-group">
+    <span class="filter-label">品牌</span>
+    <div class="multi-dd" id="brandDd">
+      <div class="multi-trigger" id="brandTrigger" onclick="toggleDd('brand')">
+        <span id="brandTriggerText">全部品牌</span>
+        <span class="arrow">▾</span>
+      </div>
+      <div class="multi-panel" id="brandPanel">
+        <div id="brandList"></div>
+      </div>
+    </div>
+  </div>
+  <!-- 站点 -->
+  <div class="filter-group">
+    <span class="filter-label">站点</span>
+    <div class="multi-dd" id="siteDd">
+      <div class="multi-trigger" id="siteTrigger" onclick="toggleDd('site')">
+        <span id="siteTriggerText">全部站点</span>
+        <span class="arrow">▾</span>
+      </div>
+      <div class="multi-panel" id="sitePanel">
+        <div id="siteList"></div>
+      </div>
+    </div>
+  </div>
+  <!-- 产品型号 -->
+  <div class="filter-group">
+    <span class="filter-label">产品型号</span>
+    <div class="multi-dd" id="modelDd">
+      <div class="multi-trigger" id="modelTrigger" onclick="toggleDd('model')">
+        <span id="modelTriggerText">全部型号</span>
+        <span class="arrow">▾</span>
+      </div>
+      <div class="multi-panel" id="modelPanel">
+        <input class="multi-search" placeholder="搜索型号..." oninput="buildModelList(this.value)" id="modelSearch">
+        <div id="modelList"></div>
+      </div>
+    </div>
+  </div>
+  <!-- 日期 -->
+  <div class="filter-group">
+    <span class="filter-label">日期范围</span>
+    <div class="quick-dates" id="quickDateBtns">
+      <button class="qd-btn" onclick="setQuickDate('7')" data-q="7">近7天</button>
+      <button class="qd-btn" onclick="setQuickDate('14')" data-q="14">近14天</button>
+      <button class="qd-btn" onclick="setQuickDate('30')" data-q="30">近30天</button>
+      <button class="qd-btn" onclick="setQuickDate('lastmonth')" data-q="lastmonth">上个月</button>
+    </div>
+    <input type="date" class="date-input" id="dateStart" oninput="clearQuickActive()">
+    <span style="font-size:12px;color:var(--gray)">至</span>
+    <input type="date" class="date-input" id="dateEnd" oninput="clearQuickActive()">
+  </div>
+  <!-- 操作按钮 -->
+  <button class="reset-btn" onclick="resetFilters()">重置</button>
+  <button class="query-btn" onclick="applyFilters()">✦ 确认查询</button>
+  <span class="filter-hint" id="filterHint">筛选条件已变更，请点击确认查询</span>
+</div>
+
+<div class="kpi-row">
+  <div class="kpi-card">
+    <div class="kpi-label">总销量（件）</div>
+    <div class="kpi-value" id="kpiSales">—</div>
+    <div class="kpi-sub" id="kpiSalesSub"></div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-label">总流量 GV</div>
+    <div class="kpi-value" id="kpiGV">—</div>
+    <div class="kpi-sub" id="kpiGVSub"></div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-label">综合转化率 CR</div>
+    <div class="kpi-value" id="kpiCR">—</div>
+    <div class="kpi-sub" id="kpiCRSub"></div>
+  </div>
+  <div class="kpi-card">
+    <div class="kpi-label">活跃 ASIN 数</div>
+    <div class="kpi-value" id="kpiActive">—</div>
+    <div class="kpi-sub" id="kpiActiveSub"></div>
+  </div>
+</div>
+
+<div class="tabs-wrap">
+  <div class="tab-nav">
+    <button class="tab-btn active" onclick="switchTab('overview',this)">📊 数据总览</button>
+    <button class="tab-btn" onclick="switchTab('anomaly',this)">🔍 异常分析</button>
+    <button class="tab-btn" onclick="switchTab('compare',this)">📈 周期对比</button>
+    <button class="tab-btn" onclick="switchTab('manage',this)">🗂️ 数据管理</button>
+  </div>
+
+  <!-- TAB 1: OVERVIEW -->
+  <div class="tab-pane active" id="pane-overview">
+    <div class="card">
+      <div class="card-title">日度销量 & 流量趋势 <span class="card-title-badge" id="trendDateRange"></span></div>
+      <div class="chart-container tall"><canvas id="trendChart"></canvas></div>
+    </div>
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-title">各型号销量排行 <span class="card-title-badge" id="modelChartRange"></span></div>
+        <div class="chart-container"><canvas id="modelChart"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title">各站点销量分布 <span class="card-title-badge" id="siteChartRange"></span></div>
+        <div class="chart-container"><canvas id="siteChart"></canvas></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">ASIN 维度明细表</div>
+      <div class="table-scroll">
+        <table id="detailTable">
+          <thead><tr><th>品牌</th><th>型号</th><th>ASIN</th><th>站点</th><th class="num">总销量</th><th class="num">总GV</th><th class="num">转化率CR</th><th class="num">日均销量</th><th class="num">日均GV</th><th>最新日数据</th></tr></thead>
+          <tbody id="detailBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 2: ANOMALY -->
+  <div class="tab-pane" id="pane-anomaly">
+    <div class="card">
+      <div class="card-title">🔔 最新日期环比异常摘要 <span style="font-size:11px;font-weight:400;color:var(--gray)" id="anomalyDateInfo"></span></div>
+      <div style="font-size:11px;color:var(--gray);margin-bottom:8px">点击卡片筛选对应类型的异常 ASIN</div>
+      <div class="anomaly-summary" id="anomalySummary"></div>
+      <!-- 异常详情面板 -->
+      <div class="anomaly-detail" id="anomalyDetail">
+        <div class="anomaly-detail-title">
+          <span id="anomalyDetailTitle">异常 ASIN 近7天 vs 前7天分析</span>
+          <button onclick="closeAnomalyDetail()" style="margin-left:auto;background:none;border:none;cursor:pointer;color:var(--gray);font-size:16px">✕</button>
+        </div>
+        <div class="detail-grid">
+          <div><div style="font-size:12px;font-weight:600;margin-bottom:6px;color:var(--gray)">销量对比（近7天 vs 前7天）</div><div class="detail-chart-wrap"><canvas id="detailSalesChart"></canvas></div></div>
+          <div><div style="font-size:12px;font-weight:600;margin-bottom:6px;color:var(--gray)">GV & CR 对比</div><div class="detail-chart-wrap"><canvas id="detailGVChart"></canvas></div></div>
+        </div>
+        <div id="detailStats" style="margin-top:12px;display:flex;gap:16px;flex-wrap:wrap;font-size:12px"></div>
+      </div>
+      <!-- 异常表格 -->
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <span id="anomalyFilterLabel" style="font-size:12px;font-weight:600;color:var(--blue);display:none">▶ 当前筛选：</span>
+        <span id="anomalyFilterTag" style="font-size:12px;display:none"></span>
+        <button id="anomalyClearFilter" onclick="clearAnomalyFilter()" style="display:none;padding:2px 8px;font-size:11px;border:1px solid var(--border);border-radius:10px;background:#fff;cursor:pointer;color:var(--gray)">清除筛选</button>
+      </div>
+      <div class="table-scroll">
+        <table id="anomalyTable">
+          <thead><tr>
+            <th>品牌</th><th>型号</th><th>ASIN</th><th>站点</th>
+            <th class="num">前日销量</th><th class="num">当日销量</th><th class="num">销量环比</th>
+            <th class="num">前日GV</th><th class="num">当日GV</th><th class="num">GV环比</th>
+            <th class="num">前日CR</th><th class="num">当日CR</th><th class="num">CR变化</th>
+            <th>异常标记</th>
+          </tr></thead>
+          <tbody id="anomalyBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 3: COMPARE -->
+  <div class="tab-pane" id="pane-compare">
+    <div class="card">
+      <div class="card-title">选择三个对比周期</div>
+      <div class="compare-quick">
+        <span style="font-size:11px;color:var(--gray);font-weight:600;align-self:center">快捷填充：</span>
+        <button class="compare-quick-btn" onclick="setComparePeriod('7v7')">近7天 vs 前7天</button>
+        <button class="compare-quick-btn" onclick="setComparePeriod('14v14')">近14天 vs 前14天</button>
+        <button class="compare-quick-btn" onclick="setComparePeriod('mvm')">本月 vs 上月</button>
+        <button class="compare-quick-btn" onclick="setComparePeriod('thirds')">三等分数据周期</button>
+      </div>
+      <div class="period-selectors">
+        <div class="period-card">
+          <div class="period-name" style="color:#2563eb">■ 周期 A</div>
+          <div class="period-dates">
+            <input type="date" class="date-input" id="p1Start">
+            <span style="color:var(--gray)">至</span>
+            <input type="date" class="date-input" id="p1End">
+          </div>
+        </div>
+        <div class="period-card">
+          <div class="period-name" style="color:#7c3aed">■ 周期 B</div>
+          <div class="period-dates">
+            <input type="date" class="date-input" id="p2Start">
+            <span style="color:var(--gray)">至</span>
+            <input type="date" class="date-input" id="p2End">
+          </div>
+        </div>
+        <div class="period-card">
+          <div class="period-name" style="color:#d97706">■ 周期 C</div>
+          <div class="period-dates">
+            <input type="date" class="date-input" id="p3Start">
+            <span style="color:var(--gray)">至</span>
+            <input type="date" class="date-input" id="p3End">
+          </div>
+        </div>
+      </div>
+      <button class="compare-btn" onclick="runComparison()">生成对比分析</button>
+    </div>
+    <div id="compareResults" style="display:none">
+      <div class="card">
+        <div class="card-title">总量对比</div>
+        <div class="anomaly-summary" id="compareSummary"></div>
+      </div>
+      <div class="compare-mover">
+        <div class="mover-card">
+          <div class="mover-title" style="color:var(--green)">📈 B vs A 增幅最大</div>
+          <div id="moverGainBA"></div>
+        </div>
+        <div class="mover-card">
+          <div class="mover-title" style="color:var(--red)">📉 B vs A 降幅最大</div>
+          <div id="moverLossBA"></div>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">各型号日均销量对比</div>
+          <div class="chart-container"><canvas id="compareChart1"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-title">日均GV & 转化率对比</div>
+          <div class="chart-container"><canvas id="compareChart2"></canvas></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">趋势走势对比（按周期内第N天）</div>
+        <div class="chart-container tall"><canvas id="compareChart3"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title">ASIN 维度三周期对比表</div>
+        <div class="table-scroll">
+          <table id="compareTable">
+            <thead id="compareTableHead"></thead>
+            <tbody id="compareTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card" id="compareAnomalyCard">
+        <div class="card-title">⚠️ 异常说明</div>
+        <div id="compareAnomalyText"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 4: DATA MANAGE -->
+  <div class="tab-pane" id="pane-manage">
+    <div class="card">
+      <div class="card-title">数据存储说明</div>
+      <p style="font-size:13px;color:#374151;line-height:1.7;margin-bottom:12px">
+        初始数据内嵌于文件中（2026-05-01 ~ 2026-06-02）。每次上传新版Excel后，新日期数据将保存到浏览器本地存储（localStorage）并与初始数据合并。
+        清除浏览器缓存会导致更新数据丢失，建议定期重新生成此文件。
+      </p>
+      <div style="display:flex;gap:12px;flex-wrap:wrap">
+        <button onclick="clearLocalData()" style="padding:8px 16px;border:1px solid var(--red);color:var(--red);background:#fff;border-radius:8px;font-size:13px;cursor:pointer">清除本地更新数据</button>
+        <button onclick="exportData()" style="padding:8px 16px;border:1px solid var(--blue);color:var(--blue);background:#fff;border-radius:8px;font-size:13px;cursor:pointer">导出当前全量数据(JSON)</button>
+      </div>
+      <div id="storageInfo" style="margin-top:16px;font-size:12px;color:var(--gray)"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">数据收录情况</div>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>品牌</th><th>型号</th><th>ASIN</th><th>站点</th><th class="num">有数据天数(销量)</th><th class="num">有数据天数(GV)</th><th>最早日期</th><th>最新日期</th></tr></thead>
+          <tbody id="manageBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ==================== DATA ====================
+const INIT_DATA = {"B09YH9MM1J|DE":{"brand":"JIMMY","model":"BX7 PRO-Gray","asin":"B09YH9MM1J","site":"DE","sales":{"2026-05-01":7.0,"2026-05-02":5.0,"2026-05-03":2.0,"2026-05-04":4.0,"2026-05-05":1.0,"2026-05-06":4.0,"2026-05-07":7.0,"2026-05-08":2.0,"2026-05-09":3.0,"2026-05-10":0.0,"2026-05-11":0.0,"2026-05-12":2.0,"2026-05-13":3.0,"2026-05-14":1.0,"2026-05-15":5.0,"2026-05-16":8.0,"2026-05-17":4.0,"2026-05-18":6.0,"2026-05-19":13.0,"2026-05-20":9.0,"2026-05-21":7.0,"2026-05-22":8.0,"2026-05-23":2.0,"2026-05-24":5.0,"2026-05-25":12.0,"2026-05-26":7.0,"2026-05-27":4.0,"2026-05-28":6.0,"2026-05-29":1.0,"2026-05-30":4.0,"2026-05-31":4.0,"2026-06-01":1.0,"2026-06-02":7.0,"2026-06-03":4.0,"2026-06-04":17.0,"2026-06-05":12.0,"2026-06-06":17.0,"2026-06-07":17.0,"2026-06-08":18.0,"2026-06-09":13.0,"2026-06-10":17.0,"2026-06-11":4.0,"2026-06-12":4.0,"2026-06-13":2.0,"2026-06-14":8.0,"2026-06-15":3.0,"2026-06-16":8.0,"2026-06-17":7.0},"gv":{"2026-05-01":145.0,"2026-05-02":92.0,"2026-05-03":116.0,"2026-05-04":72.0,"2026-05-05":26.0,"2026-05-06":302.0,"2026-05-07":318.0,"2026-05-08":148.0,"2026-05-09":35.0,"2026-05-10":24.0,"2026-05-11":20.0,"2026-05-12":16.0,"2026-05-13":42.0,"2026-05-14":55.0,"2026-05-15":122.0,"2026-05-16":125.0,"2026-05-17":146.0,"2026-05-18":94.0,"2026-05-19":235.0,"2026-05-20":214.0,"2026-05-21":174.0,"2026-05-22":128.0,"2026-05-23":125.0,"2026-05-24":149.0,"2026-05-25":170.0,"2026-05-26":131.0,"2026-05-27":93.0,"2026-05-28":113.0,"2026-05-29":118.0,"2026-05-30":87.0,"2026-05-31":162.0,"2026-06-01":142.0,"2026-06-02":137.0,"2026-06-03":139.0,"2026-06-04":237.0,"2026-06-05":232.0,"2026-06-06":254.0,"2026-06-07":340.0,"2026-06-08":236.0,"2026-06-09":250.0,"2026-06-10":271.0,"2026-06-11":206.0,"2026-06-12":179.0,"2026-06-13":124.0,"2026-06-14":223.0,"2026-06-15":177.0}},"B09YH9MM1J|FR":{"brand":"JIMMY","model":"BX7 PRO-Gray","asin":"B09YH9MM1J","site":"FR","sales":{"2026-05-01":0.0,"2026-05-02":0.0,"2026-05-03":0.0,"2026-05-04":0.0,"2026-05-05":0.0,"2026-05-06":2.0,"2026-05-07":0.0,"2026-05-08":0.0,"2026-05-09":0.0,"2026-05-10":0.0,"2026-05-11":0.0,"2026-05-12":0.0,"2026-05-13":0.0,"2026-05-14":0.0,"2026-05-15":0.0,"2026-05-16":1.0,"2026-05-17":3.0,"2026-05-18":1.0,"2026-05-19":1.0,"2026-05-20":1.0,"2026-05-21":0.0,"2026-05-22":0.0,"2026-05-23":2.0,"2026-05-24":1.0,"2026-05-25":2.0,"2026-05-26":0.0,"2026-05-27":0.0,"2026-05-28":0.0,"2026-05-29":0.0,"2026-05-30":0.0,"2026-05-31":0.0,"2026-06-01":4.0,"2026-06-02":1.0,"2026-06-03":2.0,"2026-06-04":2.0,"2026-06-05":2.0,"2026-06-06":-1.0,"2026-06-07":1.0,"2026-06-08":0.0,"2026-06-09":0.0,"2026-06-10":0.0,"2026-06-11":0.0,"2026-06-12":2.0,"2026-06-13":2.0,"2026-06-14":2.0,"2026-06-15":3.0,"2026-06-16":4.0,"2026-06-17":3.0},"gv":{"2026-05-01":38.0,"2026-05-02":34.0,"2026-05-03":13.0,"2026-05-04":16.0,"2026-05-05":4.0,"2026-05-06":19.0,"2026-05-07":12.0,"2026-05-08":8.0,"2026-05-09":0.0,"2026-05-10":12.0,"2026-05-11":5.0,"2026-05-12":1.0,"2026-05-13":18.0,"2026-05-14":49.0,"2026-05-15":31.0,"2026-05-16":32.0,"2026-05-17":31.0,"2026-05-18":29.0,"2026-05-19":32.0,"2026-05-20":29.0,"2026-05-21":29.0,"2026-05-22":19.0,"2026-05-23":16.0,"2026-05-24":45.0,"2026-05-25":34.0,"2026-05-26":21.0,"2026-05-27":24.0,"2026-05-28":20.0,"2026-05-29":14.0,"2026-05-30":29.0,"2026-05-31":49.0,"2026-06-01":33.0,"2026-06-02":35.0,"2026-06-03":42.0,"2026-06-04":30.0,"2026-06-05":34.0,"2026-06-06":28.0,"2026-06-07":25.0,"2026-06-08":39.0,"2026-06-09":21.0,"2026-06-10":14.0,"2026-06-11":8.0,"2026-06-12":24.0,"2026-06-13":72.0,"2026-06-14":52.0,"2026-06-15":59.0}},"B09YH9MM1J|IT":{"brand":"JIMMY","model":"BX7 PRO-Gray","asin":"B09YH9MM1J","site":"IT","sales":{"2026-05-01":0.0,"2026-05-02":0.0,"2026-05-03":0.0,"2026-05-04":0.0,"2026-05-05":0.0,"2026-05-06":0.0,"2026-05-07":0.0,"2026-05-08":0.0,"2026-05-09":0.0,"2026-05-10":0.0,"2026-05-11":0.0,"2026-05-12":0.0,"2026-05-13":0.0,"2026-05-14":0.0,"2026-05-15":0.0,"2026-05-16":0.0,"2026-05-17":0.0,"2026-05-18":0.0,"2026-05-19":0.0,"2026-05-20":0.0,"2026-05-21":0.0,"2026-05-22":0.0,"2026-05-23":0.0,"2026-05-24":0.0,"2026-05-25":0.0,"2026-05-26":0.0,"2026-05-27":0.0,"2026-05-28":0.0,"2026-05-29":0.0,"2026-05-30":0.0,"2026-05-31":0.0,"2026-06-01":0.0,"2026-06-02":0.0,"2026-06-03":0.0,"2026-06-04":0.0,"2026-06-05":0.0,"2026-06-06":0.0,"2026-06-07":0.0,"2026-06-08":0.0,"2026-06-09":0.0,"2026-06-10":0.0,"2026-06-11":0.0,"2026-06-12":0.0,"2026-06-13":0.0,"2026-06-14":0.0,"2026-06-15":0.0,"2026-06-16":0.0},"gv":{"2026-05-01":0.0,"2026-05-02":0.0,"2026-05-03":0.0,"2026-05-04":0.0,"2026-05-05":0.0,"2026-05-06":0.0,"2026-05-07":0.0,"2026-05-08":0.0,"2026-05-09":0.0,"2026-05-10":0.0,"2026-05-11":0.0,"2026-05-12":0.0,"2026-05-13":0.0,"2026-05-14":0.0,"2026-05-15":0.0,"2026-05-16":0.0,"2026-05-17":0.0,"2026-05-18":0.0,"2026-05-19":0.0,"2026-05-20":0.0,"2026-05-21":0.0,"2026-05-22":0.0,"2026-05-23":0.0,"2026-05-24":0.0,"2026-05-25":0.0,"2026-05-26":0.0,"2026-05-27":0.0,"2026-05-28":0.0,"2026-05-29":0.0,"2026-05-30":0.0,"2026-05-31":0.0,"2026-06-01":0.0,"2026-06-02":0.0,"2026-06-03":0.0,"2026-06-04":0.0,"2026-06-05":0.0,"2026-06-06":0.0,"2026-06-07":0.0,"2026-06-08":0.0,"2026-06-09":0.0,"2026-06-10":0.0,"2026-06-11":0.0,"2026-06-12":0.0,"2026-06-13":0.0,"2026-06-14":0.0,"2026-06-15":0.0}},"B09YH9MM1J|ES":{"brand":"JIMMY","model":"BX7 PRO-Gray","asin":"B09YH9MM1J","site":"ES","sales":{"2026-05-01":0.0,"2026-05-02":0.0,"2026-05-03":0.0,"2026-05-04":1.0,"2026-05-05":0.0,"2026-05-06":1.0,"2026-05-07":1.0,"2026-05-08":0.0,"2026-05-09":0.0,"2026-05-10":0.0,"2026-05-11":0.0,"2026-05-12":1.0,"2026-05-13":4.0,"2026-05-14":1.0,"2026-05-15":0.0,"2026-05-16":0.0,"2026-05-17":0.0,"2026-05-18":0.0,"2026-05-19":0.0,"2026-05-20":0.0,"2026-05-21":0.0,"2026-05-22":0.0,"2026-05-23":0.0,"2026-05-24":0.0,"2026-05-25":0.0,"2026-05-26":0.0,"2026-05-27":0.0,"2026-05-28":0.0,"2026-05-29":0.0,"2026-05-30":0.0,"2026-05-31":0.0,"2026-06-01":0.0,"2026-06-02":0.0,"2026-06-03":0.0,"2026-06-04":0.0,"2026-06-05":0.0,"2026-06-06":0.0,"2026-06-07":0.0,"2026-06-08":0.0,"2026-06-09":0.0,"2026-06-10":0.0,"2026-06-11":0.0,"2026-06-12":0.0,"2026-06-13":0.0,"2026-06-14":0.0,"2026-06-15":0.0,"2026-06-16":0.0,"2026-06-17":0.0},"gv":{"2026-05-01":39.0,"2026-05-03":26.0,"2026-05-04":39.0,"2026-05-05":7.0,"2026-05-06":43.0,"2026-05-07":35.0,"2026-05-08":18.0,"2026-05-09":10.0,"2026-05-10":11.0,"2026-05-11":8.0,"2026-05-12":9.0,"2026-05-13":46.0,"2026-05-14":38.0,"2026-05-15":22.0,"2026-05-16":25.0,"2026-05-17":11.0,"2026-05-18":22.0,"2026-05-19":16.0,"2026-05-20":19.0,"2026-05-21":22.0,"2026-05-22":26.0,"2026-05-23":8.0,"2026-05-24":39.0,"2026-05-25":13.0,"2026-05-26":0.0,"2026-05-27":2.0,"2026-05-28":25.0,"2026-05-29":0.0,"2026-05-30":6.0,"2026-05-31":0.0,"2026-06-01":0.0,"2026-06-02":0.0,"2026-06-03":5.0,"2026-06-04":10.0,"2026-06-05":6.0,"2026-06-06":14.0,"2026-06-07":32.0,"2026-06-08":18.0,"2026-06-09":35.0,"2026-06-10":12.0,"2026-06-11":11.0,"2026-06-12":9.0,"2026-06-13":0.0,"2026-06-14":0.0,"2026-06-15":29.0}},"B08BLTZQ7R|DE":{"brand":"JIMMY","model":"JV35","asin":"B08BLTZQ7R","site":"DE","sales":{"2026-05-01":0.0,"2026-05-02":0.0,"2026-05-03":0.0,"2026-05-04":0.0,"2026-05-05":0.0,"2026-05-06":0.0,"2026-05-07":0.0,"2026-05-08":0.0,"2026-05-09":0.0,"2026-05-10":0.0,"2026-05-11":0.0,"2026-05-12":0.0,"2026-05-13":0.0,"2026-05-14":0.0,"2026-05-15":0.0,"2026-05-16":0.0,"2026-05-17":0.0,"2026-05-18":0.0,"2026-05-19":0.0,"2026-05-20":0.0,"2026-05-21":0.0,"2026-05-22":0.0,"2026-05-23":0.0,"2026-05-24":0.0,"2026-05-25":0.0,"2026-05-26":0.0,"2026-05-27":0.0,"2026-05-28":0.0,"2026-05-29":0.0,"2026-05-30":0.0,"2026-05-31":2.0,"2026-06-01":-2.0,"2026-06-02":1.0,"2026-06-03":1.0,"2026-06-04":2.0,"2026-06-05":4.0,"2026-06-06":0.0,"2026-06-07":2.0,"2026-06-08":0.0,"2026-06-09":1.0,"2026-06-10":0.0,"2026-06-11":10.0,"2026-06-12":0.0,"2026-06-13":2.0,"2026-06-14":2.0,"2026-06-15":4.0,"2026-06-16":1.0,"2026-06-17":4.0},"gv":{"2026-05-01":0.0,"2026-05-02":30.0,"2026-05-03":0.0,"2026-05-04":0.0,"2026-05-05":0.0,"2026-05-06":0.0,"2026-05-07":0.0,"2026-05-08":0.0,"2026-05-09":0.0,"2026-05-10":0.0,"2026-05-11":0.0,"2026-05-12":0.0,"2026-05-13":0.0,"2026-05-14":0.0,"2026-05-15":0.0,"2026-05-16":0.0,"2026-05-17":0.0,"2026-05-18":0.0,"2026-05-19":0.0,"2026-05-20":0.0,"2026-05-21":376.0,"2026-05-22":267.0,"2026-05-23":47.0,"2026-05-24":0.0,"2026-05-25":0.0,"2026-05-26":0.0,"2026-05-27":1.0,"2026-05-28":2.0,"2026-05-29":1.0,"2026-05-30":0.0,"2026-05-31":1.0,"2026-06-01":1.0,"2026-06-02":15.0,"2026-06-03":21.0,"2026-06-04":22.0,"2026-06-05":42.0,"2026-06-06":11.0,"2026-06-07":18.0,"2026-06-08":11.0,"2026-06-09":4.0,"2026-06-10":10.0,"2026-06-11":199.0,"2026-06-12":10.0,"2026-06-13":13.0,"2026-06-14":19.0,"2026-06-15":87.0}},"B08BLTZQ7R|FR":{"brand":"JIMMY","model":"JV35","asin":"B08BLTZQ7R","site":"FR","sales":{"2026-05-01":0.0,"2026-05-02":0.0,"2026-05-03":0.0,"2026-05-04":0.0,"2026-05-05":0.0,"2026-05-06":0.0,"2026-05-07":0.0,"2026-05-08":0.0,"2026-05-09":0.0,"2026-05-10":0.0,"2026-05-11":0.0,"2026-05-12":0.0,"2026-05-13":0.0,"2026-05-14":0.0,"2026-05-15":0.0,"2026-05-16":0.0,"2026-05-17":0.0,"2026-05-18":0.0,"2026-05-19":0.0,"2026-05-20":0.0,"2026-05-21":0.0,"2026-05-22":0.0,"2026-05-23":0.0,"2026-05-24":0.0,"2026-05-25":0.0,"2026-05-26":0.0,"2026-05-27":0.0,"2026-05-28":0.0,"2026-05-29":0.0,"2026-05-30":0.0,"2026-05-31":0.0,"2026-06-01":0.0,"2026-06-02":0.0,"2026-06-03":0.0,"2026-06-04":0.0,"2026-06-05":0.0,"2026-06-06":0.0,"2026-06-07":0.0,"2026-06-08":0.0,"2026-06-09":0.0,"2026-06-10":0.0,"2026-06-11":0.0,"2026-06-12":0.0,"2026-06-13":0.0,"2026-06-14":0.0,"2026-06-15":2.0,"2026-06-16":0.0,"2026-06-17":0.0},"gv":{"2026-05-01":0.0,"2026-05-02":0.0,"2026-05-03":0.0,"2026-05-04":0.0,"2026-05-05":0.0,"2026-05-06":0.0,"2026-05-07":0.0,"2026-05-08":0.0,"2026-05-09":0.0,"2026-05-10":0.0,"2026-05-11":0.0,"2026-05-12":0.0,"2026-05-13":0.0,"2026-05-14":0.0,"2026-05-15":0.0,"2026-05-16":0.0,"2026-05-17":0.0,"2026-05-18":0.0,"2026-05-19":0.0,"2026-05-20":0.0,"2026-05-21":25.0,"2026-05-22":27.0,"2026-05-23":6.0,"2026-05-24":0.0,"2026-05-25":0.0,"2026-05-26":0.0,"2026-05-27":0.0,"2026-05-28":1.0,"2026-05-29":4.0,"2026-05-30":0.0,"2026-05-31":1.0,"2026-06-01":1.0,"2026-06-02":0.0,"2026-06-03":2.0,"2026-06-04":1.0,"2026-06-05":0.0,"2026-06-06":0.0,"2026-06-07":0.0,"2026-06-08":2.0,"2026-06-09":0.0,"2026-06-10":1.0,"2026-06-11":17.0,"2026-06-12":0.0,"2026-06-13":0.0,"2026-06-14":0.0,"2026-06-15":4.0}},"B08BLTZQ7R|IT":{"brand":"JIMMY","model":"JV35","asin":"B08BLTZQ7R","site":"IT","sales":{"2026-05-01":0.0,"2026-05-02":0.0,"2026-05-03":0.0,"2026-05-04":0.0,"2026-05-05":0.0,"2026-05-06":0.0,"2026-05-07":0.0,"2026-05-08":0.0,"2026-05-09":0.0,"2026-05-10":0.0,"2026-05-11":0.0,"2026-05-12":0.0,"2026-05-13":0.0,"2026-05-14":0.0,"2026-05-15":0.0,"2026-05-16":0.0,"2026-05-17":0.0,"2026-05-18":0.0,"2026-05-19":0.0,"2026-05-20":0.0,"2026-05-21":0.0,"2026-05-22":0.0,"2026-05-23":0.0,"2026-05-24":0.0,"2026-05-25":0.0,"2026-05-26":0.0,"2026-05-27":0.0,"2026-05-28":0.0,"2026-05-29":0.0,"2026-05-30":0.0,"2026-05-31":0.0,"2026-06-01":0.0,"2026-06-02":0.0,"2026-06-03":0.0,"2026-06-04":0.0,"2026-06-05":0.0,"2026-06-06":0.0,"2026-06-07":0.0,"2026-06-08":0.0,"2026-06-09":0.0,"2026-06-10":0.0,"2026-06-11":0.0,"2026-06-12":0.0,"2026-06-13":0.0,"2026-06-14":0.0,"2026-06-15":0.0,"2026-06-16":0.0},"gv":{"2026-05-01":0.0,"2026-05-02":0.0,"2026-05-03":0.0,"2026-05-04":0.0,"2026-05-05":0.0,"2026-05-06":0.0,"2026-05-07":0.0,"2026-05-08":0.0,"2026-05-09":0.0,"2026-05-10":0.0,"2026-05-11":0.0,"2026-05-12":0.0,"2026-05-13":0.0,"2026-05-14":0.0,"2026-05-15":0.0,"2026-05-16":0.0,"2026-05-17":0.0,"2026-05-18":0.0,"2026-05-19":0.0,"2026-05-20":0.0,"2026-05-21":0.0,"2026-05-22":0.0,"2026-05-23":0.0,"2026-05-24":0.0,"2026-05-25":0.0,"2026-05-26":0.0,"2026-05-27":0.0,"2026-05-28":0.0,"2026-05-29":0.0,"2026-05-30":0.0,"2026-05-31":0.0,"2026-06-01":0.0,"2026-06-02":0.0,"2026-06-03":0.0,"2026-06-04":0.0,"2026-06-05":0.0,"2026-06-06":0.0,"2026-06-07":0.0,"2026-06-08":0.0,"2026-06-09":3.0,"2026-06-10":0.0,"2026-06-11":0.0,"2026-06-12":0.0,"2026-06-13":0.0,"2026-06-14":0.0,"2026-06-15":0.0}},"B08BLTZQ7R|ES":{"brand":"JIMMY","model":"JV35","asin":"B08BLTZQ7R","site":"ES","sales":{"2026-05-01":0.0,"2026-05-02":0.0,"2026-05-03":0.0,"2026-05-04":0.0,"2026-05-05":0.0,"2026-05-06":0.0,"2026-05-07":0.0,"2026-05-08":0.0,"2026-05-09":0.0,"2026-05-10":0.0,"2026-05-11":0.0,"2026-05-12":0.0,"2026-05-13":0.0,"2026-05-14":0.0,"2026-05-15":0.0,"2026-05-16":0.0,"2026-05-17":0.0,"2026-05-18":0.0,"2026-05-19":0.0,"2026-05-20":0.0,"2026-05-21":0.0,"2026-05-22":0.0,"2026-05-23":0.0,"2026-05-24":0.0,"2026-05-25":0.0,"2026-05-26":0.0,"2026-05-27":0.0,"2026-05-28":0.0,"2026-05-29":0.0,"2026-05-30":0.0,"2026-05-31":0.0,"2026-06-01":0.0,"2026-06-02":0.0,"2026-06-03":0.0,"2026-06-04":0.0,"2026-06-05":0.0,"2026-06-06":0.0,"2026-06-07":0.0,"2026-06-08":0.0,"2026-06-09":0.0,"2026-06-10":0.0,"2026-06-11":0.0,"2026-06-12":0.0,"2026-06-13":0.0,"2026-06-14":0.0,"2026-06-15":0.0,"2026-06-16":0.0,"2026-06-17":0.0},"gv":{"2026-05-01":0.0,"2026-05-02":0.0,"2026-05-03":0.0,"2026-05-04":0.0,"2026-05-05":0.0,"2026-05-06":0.0,"2026-05-07":0.0,"2026-05-08":0.0,"2026-05-09":0.0,"2026-05-10":0.0,"2026-05-11":0.0,"2026-05-12":0.0,"2026-05-13":0.0,"2026-05-14":0.0,"2026-05-15":0.0,"2026-05-16":0.0,"2026-05-17":0.0,"2026-05-18":0.0,"2026-05-19":0.0,"2026-05-20":0.0,"2026-05-21":20.0,"2026-05-22":28.0,"2026-05-23":5.0,"2026-05-24":0.0,"2026-05-25":0.0,"2026-05-26":0.0,"2026-05-27":1.0,"2026-05-28":0.0,"2026-05-29":12.0,"2026-05-30":12.0,"2026-05-31":2.0,"2026-06-01":0.0,"2026-06-02":2.0,"2026-06-03":0.0,"2026-06-04":2.0,"2026-06-05":0.0,"2026-06-06":0.0,"2026-06-07":0.0,"2026-06-08":0.0,"2026-06-09":0.0,"2026-06-10":1.0,"2026-06-11":27.0,"2026-06-12":0.0,"2026-06-13":1.0,"2026-06-14":2.0,"2026-06-15":1.0}},"B0CKTKBSP8|DE":{"brand":"JIGOO","model":"T600-Gray","asin":"B0CKTKBSP8","site":"DE","sales":{"2026-05-01":0.0,"2026-05-02":0.0,"2026-05-03":0.0,"2026-05-04":0.0,"2026-05-05":0.0,"2026-05-06":0.0,"2026-05-07":0.0,"2026-05-08":0.0,"2026-05-09":0.0,"2026-05-10":0.0,"2026-05-11":0.0,"2026-05-12":0.0,"2026-05-13":0.0,"2026-05-14":0.0,"2026-05-15":0.0,"2026-05-16":0.0,"2026-05-17":0.0,"2026-05-18":0.0,"2026-05-19":0.0,"2026-05-20":0.0,"2026-05-21":0.0,"2026-05-22":0.0,"2026-05-23":0.0,"2026-05-24":0.0,"2026-05-25":0.0,"2026-05-26":0.0,"2026-05-27":0.0,"2026-05-28":0.0,"2026-05-29":0.0,"2026-05-30":0.0,"2026-05-31":0.0,"2026-06-01":6.0,"2026-06-02":7.0,"2026-06-03":14.0,"2026-06-04":12.0,"2026-06-05":13.0,"2026-06-06":7.0,"2026-06-07":8.0,"2026-06-08":21.0,"2026-06-09":40.0,"2026-06-10":52.0,"2026-06-11":22.0,"2026-06-12":15.0,"2026-06-13":9.0,"2026-06-14":9.0,"2026-06-15":15.0,"2026-06-16":11.0,"2026-06-17":0.0},"gv":{"2026-05-01":0.0,"2026-05-02":0.0,"2026-05-03":0.0,"2026-05-04":0.0,"2026-05-05":0.0,"2026-05-06":0.0,"2026-05-07":0.0,"2026-05-08":0.0,"2026-05-09":0.0,"2026-05-10":0.0,"2026-05-11":0.0,"2026-05-12":0.0,"2026-05-13":0.0,"2026-05-14":0.0,"2026-05-15":0.0,"2026-05-16":0.0,"2026-05-17":0.0,"2026-05-18":0.0,"2026-05-19":0.0,"2026-05-20":0.0,"2026-05-21":0.0,"2026-05-22":0.0,"2026-05-23":0.0,"2026-05-24":0.0,"2026-05-25":0.0,"2026-05-26":0.0,"2026-05-27":0.0,"2026-05-28":0.0,"2026-05-29":0.0,"2026-05-30":0.0,"2026-05-31":0.0,"2026-06-01":0.0,"2026-06-02":0.0,"2026-06-03":0.0,"2026-06-04":0.0,"2026-06-05":0.0,"2026-06-06":0.0,"2026-06-07":0.0,"2026-06-08":0.0,"2026-06-09":0.0,"2026-06-10":0.0,"2026-06-11":0.0,"2026-06-12":0.0,"2026-06-13":0.0,"2026-06-14":0.0,"2026-06-15":0.0}},"B0CKTKBSP8|FR":{"brand":"JIGOO","model":"T600-Gray","asin":"B0CKTKBSP8","site":"FR","sales":{"2026-05-01":0.0,"2026-05-02":2.0,"2026-05-03":2.0,"2026-05-04":4.0,"2026-05-05":1.0,"2026-05-06":1.0,"2026-05-07":0.0,"2026-05-08":2.0,"2026-05-09":0.0,"2026-05-10":0.0,"2026-05-11":5.0,"2026-05-12":2.0,"2026-05-13":2.0,"2026-05-14":2.0,"2026-05-15":1.0,"2026-05-16":3.0,"2026-05-17":4.0,"2026-05-18":7.0,"2026-05-19":5.0,"2026-05-20":3.0,"2026-05-21":1.0,"2026-05-22":1.0,"2026-05-23":0.0,"2026-05-24":-1.0,"2026-05-25":1.0,"2026-05-26":0.0,"2026-05-27":1.0,"2026-05-28":1.0,"2026-05-29":1.0,"2026-05-30":1.0,"2026-05-31":1.0,"2026-06-01":3.0,"2026-06-02":1.0,"2026-06-03":3.0,"2026-06-04":0.0,"2026-06-05":-1.0,"2026-06-06":3.0,"2026-06-07":1.0,"2026-06-08":1.0,"2026-06-09":2.0,"2026-06-10":1.0,"2026-06-11":4.0,"2026-06-12":1.0,"2026-06-13":3.0,"2026-06-14":3.0,"2026-06-15":1.0,"2026-06-16":3.0,"2026-06-17":4.0},"gv":{"2026-05-01":170.0,"2026-05-02":258.0,"2026-05-03":228.0,"2026-05-04":223.0,"2026-05-05":215.0,"2026-05-06":388.0,"2026-05-07":213.0,"2026-05-08":142.0,"2026-05-09":115.0,"2026-05-10":158.0,"2026-05-11":172.0,"2026-05-12":175.0,"2026-05-13":147.0,"2026-05-14":141.0,"2026-05-15":130.0,"2026-05-16":146.0,"2026-05-17":139.0,"2026-05-18":158.0,"2026-05-19":130.0,"2026-05-20":164.0,"2026-05-21":75.0,"2026-05-22":74.0,"2026-05-23":58.0,"2026-05-24":90.0,"2026-05-25":68.0,"2026-05-26":46.0,"2026-05-27":61.0,"2026-05-28":54.0,"2026-05-29":62.0,"2026-05-30":64.0,"2026-05-31":106.0,"2026-06-01":113.0,"2026-06-02":103.0,"2026-06-03":103.0,"2026-06-04":89.0,"2026-06-05":79.0,"2026-06-06":81.0,"2026-06-07":45.0,"2026-06-08":40.0,"2026-06-09":56.0,"2026-06-10":39.0,"2026-06-11":49.0,"2026-06-12":57.0,"2026-06-13":98.0,"2026-06-14":84.0,"2026-06-15":94.0}},"B0CKTKBSP8|IT":{"brand":"JIGOO","model":"T600-Gray","asin":"B0CKTKBSP8","site":"IT","sales":{"2026-05-01":0.0,"2026-05-02":0.0,"2026-05-03":0.0,"2026-05-04":0.0,"2026-05-05":0.0,"2026-05-06":0.0,"2026-05-07":0.0,"2026-05-08":0.0,"2026-05-09":0.0,"2026-05-10":0.0,"2026-05-11":0.0,"2026-05-12":0.0,"2026-05-13":0.0,"2026-05-14":0.0,"2026-05-15":0.0,"2026-05-16":0.0,"2026-05-17":0.0,"2026-05-18":0.0,"2026-05-19":0.0,"2026-05-20":0.0,"2026-05-21":0.0,"2026-05-22":0.0,"2026-05-23":0.0,"2026-05-24":0.0,"2026-05-25":0.0,"2026-05-26":0.0,"2026-05-27":0.0,"2026-05-28":0.0,"2026-05-29":0.0,"2026-05-30":0.0,"2026-05-31":0.0,"2026-06-01":3.0,"2026-06-02":4.0,"2026-06-03":6.0,"2026-06-04":13.0,"2026-06-05":6.0,"2026-06-06":13.0,"2026-06-07":4.0,"2026-06-08":7.0,"2026-06-09":7.0,"2026-06-10":5.0,"2026-06-11":1.0,"2026-06-12":1.0,"2026-06-13":0.0,"2026-06-14":1.0,"2026-06-15":0.0,"2026-06-16":0.0,"2026-06-17":0.0},"gv":{"2026-05-01":0.0,"2026-05-02":0.0,"2026-05-03":0.0,"2026-05-04":0.0,"2026-05-05":0.0,"2026-05-06":0.0,"2026-05-07":0.0,"2026-05-08":0.0,"2026-05-09":0.0,"2026-05-10":0.0,"2026-05-11":0.0,"2026-05-12":0.0,"2026-05-13":0.0,"2026-05-14":0.0,"2026-05-15":0.0,"2026-05-16":0.0,"2026-05-17":0.0,"2026-05-18":0.0,"2026-05-19":0.0,"2026-05-20":0.0,"2026-05-21":0.0,"2026-05-22":0.0,"2026-05-23":0.0,"2026-05-24":0.0,"2026-05-25":0.0,"2026-05-26":0.0,"2026-05-27":0.0,"2026-05-28":0.0,"2026-05-29":0.0,"2026-05-30":0.0,"2026-05-31":0.0,"2026-06-01":0.0,"2026-06-02":0.0,"2026-06-03":0.0,"2026-06-04":0.0,"2026-06-05":0.0,"2026-06-06":0.0,"2026-06-07":0.0,"2026-06-08":0.0,"2026-06-09":0.0,"2026-06-10":0.0,"2026-06-11":0.0,"2026-06-12":0.0,"2026-06-13":0.0,"2026-06-14":0.0,"2026-06-15":0.0}},"B0CKTKBSP8|ES":{"brand":"JIGOO","model":"T600-Gray","asin":"B0CKTKBSP8","site":"ES","sales":{"2026-05-01":0.0,"2026-05-02":0.0,"2026-05-03":0.0,"2026-05-04":0.0,"2026-05-05":0.0,"2026-05-06":0.0,"2026-05-07":0.0,"2026-05-08":0.0,"2026-05-09":0.0,"2026-05-10":0.0,"2026-05-11":0.0,"2026-05-12":0.0,"2026-05-13":0.0,"2026-05-14":0.0,"2026-05-15":0.0,"2026-05-16":0.0,"2026-05-17":0.0,"2026-05-18":0.0,"2026-05-19":0.0,"2026-05-20":0.0,"2026-05-21":0.0,"2026-05-22":0.0,"2026-05-23":0.0,"2026-05-24":0.0,"2026-05-25":0.0,"2026-05-26":0.0,"2026-05-27":0.0,"2026-05-28":0.0,"2026-05-29":0.0,"2026-05-30":0.0,"2026-05-31":0.0,"2026-06-01":2.0,"2026-06-02":0.0,"2026-06-03":21.0,"2026-06-04":17.0,"2026-06-05":11.0,"2026-06-06":6.0,"2026-06-07":1.0,"2026-06-08":7.0,"2026-06-09":7.0,"2026-06-10":6.0,"2026-06-11":7.0,"2026-06-12":6.0,"2026-06-13":0.0,"2026-06-14":4.0,"2026-06-15":6.0,"2026-06-16":5.0,"2026-06-17":0.0},"gv":{"2026-05-01":0.0,"2026-05-02":0.0,"2026-05-03":0.0,"2026-05-04":0.0,"2026-05-05":0.0,"2026-05-06":0.0,"2026-05-07":0.0,"2026-05-08":0.0,"2026-05-09":0.0,"2026-05-10":0.0,"2026-05-11":0.0,"2026-05-12":0.0,"2026-05-13":0.0,"2026-05-14":0.0,"2026-05-15":0.0,"2026-05-16":0.0,"2026-05-17":0.0,"2026-05-18":0.0,"2026-05-19":0.0,"2026-05-20":0.0,"2026-05-21":0.0,"2026-05-22":0.0,"2026-05-23":0.0,"2026-05-24":0.0,"2026-05-25":0.0,"2026-05-26":0.0,"2026-05-27":0.0,"2026-05-28":0.0,"2026-05-29":0.0,"2026-05-30":0.0,"2026-05-31":0.0,"2026-06-01":0.0,"2026-06-02":0.0,"2026-06-03":0.0,"2026-06-04":0.0,"2026-06-05":0.0,"2026-06-06":0.0,"2026-06-07":0.0,"2026-06-08":0.0,"2026-06-09":0.0,"2026-06-10":0.0,"2026-06-11":0.0,"2026-06-12":0.0,"2026-06-13":0.0,"2026-06-14":0.0,"2026-06-15":0.0}},"B0CKYLGK1Z|DE":{"brand":"JIGOO","model":"T600-White","asin":"B0CKYLGK1Z","site":"DE","sales":{"2026-05-01":0.0,"2026-05-02":0.0,"2026-05-03":0.0,"2026-05-04":0.0,"2026-05-05":0.0,"2026-05-06":0.0,"2026-05-07":0.0,"2026-05-08":0.0,"2026-05-09":0.0,"2026-05-10":0.0,"2026-05-11":0.0,"2026-05-12":0.0,"2026-05-13":0.0,"2026-05-14":0.0,"2026-05-15":0.0,"2026-05-16":0.0,"2026-05-17":0.0,"2026-05-18":0.0,"2026-05-19":0.0,"2026-05-20":0.0,"2026-05-21":0.0,"2026-05-22":0.0,"2026-05-23":0.0,"2026-05-24":0.0,"2026-05-25":0.0,"2026-05-26":0.0,"2026-05-27":0.0,"2026-05-28":0.0,"2026-05-29":0.0,"2026-05-30":0.0,"2026-05-31":0.0,"2026-06-01":2.0,"2026-06-02":0.0,"2026-06-03":3.0,"2026-06-04":3.0,"2026-06-05":0.0,"2026-06-06":1.0,"2026-06-07":2.0,"2026-06-08":11.0,"2026-06-09":6.0,"2026-06-10":5.0,"2026-06-11":7.0,"2026-06-12":8.0,"2026-06-13":6.0,"2026-06-14":3.0,"2026-06-15":2.0,"2026-06-16":4.0,"2026-06-17":0.0},"gv":{"2026-05-01":0.0,"2026-05-02":0.0,"2026-05-03":0.0,"2026-05-04":0.0,"2026-05-05":0.0,"2026-05-06":0.0,"2026-05-07":0.0,"2026-05-08":0.0,"2026-05-09":0.0,"2026-05-10":0.0,"2026-05-11":0.0,"2026-05-12":0.0,"2026-05-13":0.0,"2026-05-14":0.0,"2026-05-15":0.0,"2026-05-16":0.0,"2026-05-17":0.0,"2026-05-18":0.0,"2026-05-19":0.0,"2026-05-20":0.0,"2026-05-21":0.0,"2026-05-22":0.0,"2026-05-23":0.0,"2026-05-24":0.0,"2026-05-25":0.0,"2026-05-26":0.0,"2026-05-27":0.0,"2026-05-28":0.0,"2026-05-29":0.0,"2026-05-30":0.0,"2026-05-31":0.0,"2026-06-01":0.0,"2026-06-02":0.0,"2026-06-03":0.0,"2026-06-04":0.0,"2026-06-05":0.0,"2026-06-06":0.0,"2026-06-07":0.0,"2026-06-08":0.0,"2026-06-09":0.0,"2026-06-10":0.0,"2026-06-11":0.0,"2026-06-12":0.0,"2026-06-13":0.0,"2026-06-14":0.0,"2026-06-15":0.0}},"B0CKYLGK1Z|FR":{"brand":"JIGOO","model":"T600-White","asin":"B0CKYLGK1Z","site":"FR","sales":{"2026-05-01":0.0,"2026-05-02":0.0,"2026-05-03":0.0,"2026-05-04":0.0,"2026-05-05":0.0,"2026-05-06":0.0,"2026-05-07":2.0,"2026-05-08":0.0,"2026-05-09":0.0,"2026-05-10":0.0,"2026-05-11":-1.0,"2026-05-12":1.0,"2026-05-13":1.0,"2026-05-14":1.0,"2026-05-15":0.0,"2026-05-16":2.0,"2026-05-17":0.0,"2026-05-18":0.0,"2026-05-19":0.0,"2026-05-20":0.0,"2026-05-21":0.0,"2026-05-22":0.0,"2026-05-23":0.0,"2026-05-24":0.0,"2026-05-25":0.0,"2026-05-26":0.0,"2026-05-27":0.0,"2026-05-28":0.0,"2026-05-29":0.0,"2026-05-30":0.0,"2026-05-31":1.0,"2026-06-01":0.0,"2026-06-02":0.0,"2026-06-03":1.0,"2026-06-04":0.0,"2026-06-05":1.0,"2026-06-06":3.0,"2026-06-07":1.0,"2026-06-08":1.0,"2026-06-09":1.0,"2026-06-10":0.0,"2026-06-11":2.0,"2026-06-12":0.0,"2026-06-13":0.0,"2026-06-14":1.0,"2026-06-15":2.0,"2026-06-16":1.0,"2026-06-17":0.0},"gv":{"2026-05-01":61.0,"2026-05-02":109.0,"2026-05-03":170.0,"2026-05-04":169.0,"2026-05-05":178.0,"2026-05-06":161.0,"2026-05-07":106.0,"2026-05-08":74.0,"2026-05-09":48.0,"2026-05-10":36.0,"2026-05-11":52.0,"2026-05-12":77.0,"2026-05-13":46.0,"2026-05-14":44.0,"2026-05-15":28.0,"2026-05-16":53.0,"2026-05-17":38.0,"2026-05-18":39.0,"2026-05-19":22.0,"2026-05-20":42.0,"2026-05-21":9.0,"2026-05-22":5.0,"2026-05-23":5.0,"2026-05-24":15.0,"2026-05-25":5.0,"2026-05-26":4.0,"2026-05-27":10.0,"2026-05-28":3.0,"2026-05-29":23.0,"2026-05-30":6.0,"2026-05-31":25.0,"2026-06-01":17.0,"2026-06-02":23.0,"2026-06-03":32.0,"2026-06-04":11.0,"2026-06-05":10.0,"2026-06-06":20.0,"2026-06-07":13.0,"2026-06-08":4.0,"2026-06-09":1.0,"2026-06-10":1.0,"2026-06-11":12.0,"2026-06-12":14.0,"2026-06-13":26.0,"2026-06-14":24.0,"2026-06-15":26.0}},"B0CKYLGK1Z|IT":{"brand":"JIGOO","model":"T600-White","asin":"B0CKYLGK1Z","site":"IT","sales":{"2026-05-01":0.0,"2026-05-02":0.0,"2026-05-03":0.0,"2026-05-04":0.0,"2026-05-05":0.0,"2026-05-06":0.0,"2026-05-07":0.0,"2026-05-08":0.0,"2026-05-09":0.0,"2026-05-10":0.0,"2026-05-11":0.0,"2026-05-12":0.0,"2026-05-13":0.0,"2026-05-14":0.0,"2026-05-15":0.0,"2026-05-16":0.0,"2026-05-17":0.0,"2026-05-18":0.0,"2026-05-19":0.0,"2026-05-20":0.0,"2026-05-21":0.0,"2026-05-22":0.0,"2026-05-23":0.0,"2026-05-24":0.0,"2026-05-25":0.0,"2026-05-26":0.0,"2026-05-27":0.0,"2026-05-28":0.0,"2026-05-29":0.0,"2026-05-30":0.0,"2026-05-31":0.0,"2026-06-01":4.0,"2026-06-02":7.0,"2026-06-03":4.0,"2026-06-04":2.0,"2026-06-05":4.0,"2026-06-06":4.0,"2026-06-07":7.0,"2026-06-08":0.0,"2026-06-09":1.0,"2026-06-10":1.0,"2026-06-11":2.0,"2026-06-12":9.0,"2026-06-13":3.0,"2026-06-14":2.0,"2026-06-15":3.0,"2026-06-16":7.0,"2026-06-17":0.0},"gv":{"2026-05-01":0.0,"2026-05-02":0.0,"2026-05-03":0.0,"2026-05-04":0.0,"2026-05-05":0.0,"2026-05-06":0.0,"2026-05-07":0.0,"2026-05-08":0.0,"2026-05-09":0.0,"2026-05-10":0.0,"2026-05-11":0.0,"2026-05-12":0.0,"2026-05-13":0.0,"2026-05-14":0.0,"2026-05-15":0.0,"2026-05-16":0.0,"2026-05-17":0.0,"2026-05-18":0.0,"2026-05-19":0.0,"2026-05-20":0.0,"2026-05-21":0.0,"2026-05-22":0.0,"2026-05-23":0.0,"2026-05-24":0.0,"2026-05-25":0.0,"2026-05-26":0.0,"2026-05-27":0.0,"2026-05-28":0.0,"2026-05-29":0.0,"2026-05-30":0.0,"2026-05-31":0.0,"2026-06-01":0.0,"2026-06-02":0.0,"2026-06-03":0.0,"2026-06-04":0.0,"2026-06-05":0.0,"2026-06-06":0.0,"2026-06-07":0.0,"2026-06-08":0.0,"2026-06-09":0.0,"2026-06-10":0.0,"2026-06-11":0.0,"2026-06-12":0.0,"2026-06-13":0.0,"2026-06-14":0.0,"2026-06-15":0.0}},"B0CKYLGK1Z|ES":{"brand":"JIGOO","model":"T600-White","asin":"B0CKYLGK1Z","site":"ES","sales":{"2026-05-01":0.0,"2026-05-02":0.0,"2026-05-03":0.0,"2026-05-04":0.0,"2026-05-05":0.0,"2026-05-06":0.0,"2026-05-07":0.0,"2026-05-08":0.0,"2026-05-09":0.0,"2026-05-10":0.0,"2026-05-11":0.0,"2026-05-12":0.0,"2026-05-13":0.0,"2026-05-14":0.0,"2026-05-15":0.0,"2026-05-16":0.0,"2026-05-17":0.0,"2026-05-18":0.0,"2026-05-19":0.0,"2026-05-20":0.0,"2026-05-21":0.0,"2026-05-22":0.0,"2026-05-23":0.0,"2026-05-24":0.0,"2026-05-25":0.0,"2026-05-26":0.0,"2026-05-27":0.0,"2026-05-28":0.0,"2026-05-29":0.0,"2026-05-30":0.0,"2026-05-31":0.0,"2026-06-01":0.0,"2026-06-02":1.0,"2026-06-03":1.0,"2026-06-04":2.0,"2026-06-05":2.0,"2026-06-06":5.0,"2026-06-07":3.0,"2026-06-08":0.0,"2026-06-09":0.0,"2026-06-10":2.0,"2026-06-11":4.0,"2026-06-12":2.0,"2026-06-13":0.0,"2026-06-14":2.0,"2026-06-15":1.0,"2026-06-16":1.0,"2026-06-17":0.0},"gv":{"2026-05-01":0.0,"2026-05-02":0.0,"2026-05-03":0.0,"2026-05-04":0.0,"2026-05-05":0.0,"2026-05-06":0.0,"2026-05-07":0.0,"2026-05-08":0.0,"2026-05-09":0.0,"2026-05-10":0.0,"2026-05-11":0.0,"2026-05-12":0.0,"2026-05-13":0.0,"2026-05-14":0.0,"2026-05-15":0.0,"2026-05-16":0.0,"2026-05-17":0.0,"2026-05-18":0.0,"2026-05-19":0.0,"2026-05-20":0.0,"2026-05-21":0.0,"2026-05-22":0.0,"2026-05-23":0.0,"2026-05-24":0.0,"2026-05-25":0.0,"2026-05-26":0.0,"2026-05-27":0.0,"2026-05-28":0.0,"2026-05-29":0.0,"2026-05-30":0.0,"2026-05-31":0.0,"2026-06-01":0.0,"2026-06-02":0.0,"2026-06-03":0.0,"2026-06-04":0.0,"2026-06-05":0.0,"2026-06-06":0.0,"2026-06-07":0.0,"2026-06-08":0.0,"2026-06-09":0.0,"2026-06-10":0.0,"2026-06-11":0.0,"2026-06-12":0.0,"2026-06-13":0.0,"2026-06-14":0.0,"2026-06-15":0.0}},"B0GWD94VPC|DE":{"brand":"JIGOO","model":"T600-Gray-New","asin":"B0GWD94VPC","site":"DE","sales":{"2026-05-01":0.0,"2026-05-02":0.0,"2026-05-03":0.0,"2026-05-04":0.0,"2026-05-05":0.0,"2026-05-06":0.0,"2026-05-07":0.0,"2026-05-08":0.0,"2026-05-09":0.0,"2026-05-10":0.0,"2026-05-11":0.0,"2026-05-12":0.0,"2026-05-13":0.0,"2026-05-14":0.0,"2026-05-15":0.0,"2026-05-16":0.0,"2026-05-17":0.0,"2026-05-18":0.0,"2026-05-19":0.0,"2026-05-20":0.0,"2026-05-21":0.0,"2026-05-22":0.0,"2026-05-23":0.0,"2026-05-24":0.0,"2026-05-25":0.0,"2026-05-26":0.0,"2026-05-27":0.0,"2026-05-28":0.0,"2026-05-29":0.0,"2026-05-30":0.0,"2026-05-31":1.0,"2026-06-01":0.0,"2026-06-02":0.0,"2026-06-03":0.0,"2026-06-04":0.0,"2026-06-05":0.0,"2026-06-06":0.0,"2026-06-07":0.0,"2026-06-08":0.0,"2026-06-09":0.0,"2026-06-10":0.0,"2026-06-11":0.0,"2026-06-12":0.0,"2026-06-13":0.0,"2026-06-14":2.0,"2026-06-15":0.0,"2026-06-16":0.0,"2026-06-17":0.0},"gv":{"2026-05-01":0.0,"2026-05-02":0.0,"2026-05-03":0.0,"2026-05-04":0.0,"2026-05-05":0.0,"2026-05-06":3.0,"2026-05-07":1.0,"2026-05-08":0.0,"2026-05-09":1.0,"2026-05-10":0.0,"2026-05-11":0.0,"2026-05-12":2.0,"2026-05-13":0.0,"2026-05-14":2.0,"2026-05-15":0.0,"2026-05-16":0.0,"2026-05-17":2.0,"2026-05-18":1.0,"2026-05-19":0.0,"2026-05-20":0.0,"2026-05-21":1.0,"2026-05-22":1.0,"2026-05-23":0.0,"2026-05-24":1.0,"2026-05-25":0.0,"2026-05-26":0.0,"2026-05-27":3.0,"2026-05-28":0.0,"2026-05-29":2.0,"2026-05-30":2.0,"2026-05-31":0.0,"2026-06-01":1.0,"2026-06-02":5.0,"2026-06-03":5.0,"2026-06-04":0.0,"2026-06-05":0.0,"2026-06-06":1.0,"2026-06-07":2.0,"2026-06-08":0.0,"2026-06-09":0.0,"2026-06-10":2.0,"2026-06-11":1.0,"2026-06-12":0.0,"2026-06-13":1.0,"2026-06-14":5.0,"2026-06-15":0.0}},"B0GWD94VPC|FR":{"brand":"JIGOO","model":"T600-Gray-New","asin":"B0GWD94VPC","site":"FR","sales":{"2026-05-01":0.0,"2026-05-02":0.0,"2026-05-03":0.0,"2026-05-04":0.0,"2026-05-05":0.0,"2026-05-06":0.0,"2026-05-07":0.0,"2026-05-08":0.0,"2026-05-09":0.0,"2026-05-10":0.0,"2026-05-11":0.0,"2026-05-12":0.0,"2026-05-13":0.0,"2026-05-14":0.0,"2026-05-15":0.0,"2026-05-16":0.0,"2026-05-17":0.0,"2026-05-18":0.0,"2026-05-19":0.0,"2026-05-20":0.0,"2026-05-21":0.0,"2026-05-22":0.0,"2026-05-23":0.0,"2026-05-24":0.0,"2026-05-25":0.0,"2026-05-26":0.0,"2026-05-27":0.0,"2026-05-28":0.0,"2026-05-29":0.0,"2026-05-30":0.0,"2026-05-31":0.0,"2026-06-01":0.0,"2026-06-02":0.0,"2026-06-03":0.0,"2026-06-04":0.0,"2026-06-05":0.0,"2026-06-06":0.0,"2026-06-07":0.0,"2026-06-08":0.0,"2026-06-09":1.0,"2026-06-10":0.0,"2026-06-11":0.0,"2026-06-12":0.0,"2026-06-13":0.0,"2026-06-14":0.0,"2026-06-15":0.0,"2026-06-16":0.0,"2026-06-17":0.0},"gv":{"2026-05-01":0.0,"2026-05-02":0.0,"2026-05-03":0.0,"2026-05-04":0.0,"2026-05-05":0.0,"2026-05-06":0.0,"2026-05-07":1.0,"2026-05-08":1.0,"2026-05-09":0.0,"2026-05-10":0.0,"2026-05-11":0.0,"2026-05-12":0.0,"2026-05-13":1.0,"2026-05-14":0.0,"2026-05-15":0.0,"2026-05-16":0.0,"2026-05-17":0.0,"2026-05-18":0.0,"2026-05-19":0.0,"2026-05-20":1.0,"2026-05-21":0.0,"2026-05-22":0.0,"2026-05-23":0.0,"2026-05-24":0.0,"2026-05-25":0.0,"2026-05-26":1.0,"2026-05-27":0.0,"2026-05-28":0.0,"2026-05-29":6.0,"2026-05-30":0.0,"2026-05-31":1.0,"2026-06-01":2.0,"2026-06-02":2.0,"2026-06-03":1.0,"2026-06-04":0.0,"2026-06-05":0.0,"2026-06-06":0.0,"2026-06-07":0.0,"2026-06-08":1.0,"2026-06-09":1.0,"2026-06-10":4.0,"2026-06-11":4.0,"2026-06-12":0.0,"2026-06-13":1.0,"2026-06-14":0.0,"2026-06-15":1.0}},"B0GWD94VPC|IT":{"brand":"JIGOO","model":"T600-Gray-New","asin":"B0GWD94VPC","site":"IT","sales":{"2026-05-01":0.0,"2026-05-02":0.0,"2026-05-03":0.0,"2026-05-04":0.0,"2026-05-05":0.0,"2026-05-06":0.0,"2026-05-07":0.0,"2026-05-08":0.0,"2026-05-09":0.0,"2026-05-10":0.0,"2026-05-11":0.0,"2026-05-12":0.0,"2026-05-13":0.0,"2026-05-14":0.0,"2026-05-15":0.0,"2026-05-16":0.0,"2026-05-17":0.0,"2026-05-18":0.0,"2026-05-19":0.0,"2026-05-20":0.0,"2026-05-21":0.0,"2026-05-22":0.0,"2026-05-23":1.0,"2026-05-24":0.0,"2026-05-25":0.0,"2026-05-26":0.0,"2026-05-27":0.0,"2026-05-28":0.0,"2026-05-29":0.0,"2026-05-30":0.0,"2026-05-31":1.0,"2026-06-01":0.0,"2026-06-02":0.0,"2026-06-03":0.0,"2026-06-04":0.0,"2026-06-05":0.0,"2026-06-06":1.0,"2026-06-07":0.0,"2026-06-08":0.0,"2026-06-09":0.0,"2026-06-10":0.0,"2026-06-11":1.0,"2026-06-12":0.0,"2026-06-13":0.0,"2026-06-14":1.0,"2026-06-15":0.0,"2026-06-16":-1.0,"2026-06-17":1.0},"gv":{"2026-05-01":0.0,"2026-05-02":0.0,"2026-05-03":0.0,"2026-05-04":3.0,"2026-05-05":3.0,"2026-05-06":2.0,"2026-05-07":3.0,"2026-05-08":4.0,"2026-05-09":7.0,"2026-05-10":9.0,"2026-05-11":13.0,"2026-05-12":8.0,"2026-05-13":8.0,"2026-05-14":9.0,"2026-05-15":10.0,"2026-05-16":3.0,"2026-05-17":5.0,"2026-05-18":4.0,"2026-05-19":4.0,"2026-05-20":7.0,"2026-05-21":6.0,"2026-05-22":2.0,"2026-05-23":6.0,"2026-05-24":4.0,"2026-05-25":4.0,"2026-05-26":8.0,"2026-05-27":11.0,"2026-05-28":10.0,"2026-05-29":5.0,"2026-05-30":6.0,"2026-05-31":11.0,"2026-06-01":5.0,"2026-06-02":10.0,"2026-06-03":6.0,"2026-06-04":21.0,"2026-06-05":5.0,"2026-06-06":10.0,"2026-06-07":10.0,"2026-06-08":11.0,"2026-06-09":4.0,"2026-06-10":8.0,"2026-06-11":13.0,"2026-06-12":3.0,"2026-06-13":9.0,"2026-06-14":18.0,"2026-06-15":11.0}},"B0GWD94VPC|ES":{"brand":"JIGOO","model":"T600-Gray-New","asin":"B0GWD94VPC","site":"ES","sales":{"2026-05-01":0.0,"2026-05-02":0.0,"2026-05-03":0.0,"2026-05-04":0.0,"2026-05-05":0.0,"2026-05-06":0.0,"2026-05-07":0.0,"2026-05-08":0.0,"2026-05-09":0.0,"2026-05-10":0.0,"2026-05-11":0.0,"2026-05-12":0.0,"2026-05-13":0.0,"2026-05-14":0.0,"2026-05-15":0.0,"2026-05-16":0.0,"2026-05-17":0.0,"2026-05-18":0.0,"2026-05-19":0.0,"2026-05-20":0.0,"2026-05-21":0.0,"2026-05-22":0.0,"2026-05-23":0.0,"2026-05-24":0.0,"2026-05-25":0.0,"2026-05-26":0.0,"2026-05-27":0.0,"2026-05-28":0.0,"2026-05-29":0.0,"2026-05-30":0.0,"2026-05-31":0.0,"2026-06-01":0.0,"2026-06-02":0.0,"2026-06-03":0.0,"2026-06-04":0.0,"2026-06-05":0.0,"2026-06-06":0.0,"2026-06-07":0.0,"2026-06-08":0.0,"2026-06-09":0.0,"2026-06-10":0.0,"2026-06-11":0.0,"2026-06-12":0.0,"2026-06-13":0.0,"2026-06-14":0.0,"2026-06-15":0.0,"2026-06-16":0.0,"2026-06-17":0.0},"gv":{"2026-05-01":0.0,"2026-05-02":0.0,"2026-05-03":0.0,"2026-05-04":1.0,"2026-05-05":0.0,"2026-05-06":0.0,"2026-05-07":0.0,"2026-05-08":0.0,"2026-05-09":0.0,"2026-05-10":1.0,"2026-05-11":0.0,"2026-05-12":1.0,"2026-05-13":0.0,"2026-05-14":0.0,"2026-05-15":0.0,"2026-05-16":2.0,"2026-05-17":0.0,"2026-05-18":2.0,"2026-05-19":1.0,"2026-05-20":2.0,"2026-05-21":1.0,"2026-05-22":1.0,"2026-05-23":1.0,"2026-05-24":7.0,"2026-05-25":1.0,"2026-05-26":3.0,"2026-05-27":1.0,"2026-05-28":1.0,"2026-05-29":4.0,"2026-05-30":1.0,"2026-05-31":4.0,"2026-06-01":2.0,"2026-06-02":4.0,"2026-06-03":4.0,"2026-06-04":1.0,"2026-06-05":1.0,"2026-06-06":3.0,"2026-06-07":3.0,"2026-06-08":2.0,"2026-06-09":0.0,"2026-06-10":0.0,"2026-06-11":0.0,"2026-06-12":0.0,"2026-06-13":0.0,"2026-06-14":2.0,"2026-06-15":0.0}},"B0D5LDYQFZ|DE":{"brand":"JIGOO","model":"T600-White-New","asin":"B0D5LDYQFZ","site":"DE","sales":{"2026-05-01":0.0,"2026-05-02":0.0,"2026-05-03":0.0,"2026-05-04":0.0,"2026-05-05":0.0,"2026-05-06":0.0,"2026-05-07":0.0,"2026-05-08":0.0,"2026-05-09":0.0,"2026-05-10":0.0,"2026-05-11":0.0,"2026-05-12":0.0,"2026-05-13":0.0,"2026-05-14":0.0,"2026-05-15":0.0,"2026-05-16":0.0,"2026-05-17":0.0,"2026-05-18":0.0,"2026-05-19":0.0,"2026-05-20":0.0,"2026-05-21":0.0,"2026-05-22":0.0,"2026-05-23":0.0,"2026-05-24":0.0,"2026-05-25":0.0,"2026-05-26":0.0,"2026-05-27":0.0,"2026-05-28":0.0,"2026-05-29":0.0,"2026-05-30":0.0,"2026-05-31":0.0,"2026-06-01":0.0,"2026-06-02":0.0,"2026-06-03":0.0,"2026-06-04":0.0,"2026-06-05":0.0,"2026-06-06":0.0,"2026-06-07":0.0,"2026-06-08":0.0,"2026-06-09":0.0,"2026-06-10":0.0,"2026-06-11":0.0,"2026-06-12":0.0,"2026-06-13":0.0,"2026-06-14":1.0,"2026-06-15":0.0,"2026-06-16":0.0,"2026-06-17":0.0},"gv":{"2026-05-01":0.0,"2026-05-02":0.0,"2026-05-03":0.0,"2026-05-04":0.0,"2026-05-05":0.0,"2026-05-06":1.0,"2026-05-07":3.0,"2026-05-08":0.0,"2026-05-09":1.0,"2026-05-10":3.0,"2026-05-11":0.0,"2026-05-12":2.0,"2026-05-13":0.0,"2026-05-14":1.0,"2026-05-15":1.0,"2026-05-16":0.0,"2026-05-17":3.0,"2026-05-18":2.0,"2026-05-19":2.0,"2026-05-20":2.0,"2026-05-21":2.0,"2026-05-22":3.0,"2026-05-23":0.0,"2026-05-24":2.0,"2026-05-25":0.0,"2026-05-26":2.0,"2026-05-27":3.0,"2026-05-28":0.0,"2026-05-29":0.0,"2026-05-30":2.0,"2026-05-31":1.0,"2026-06-01":3.0,"2026-06-02":2.0,"2026-06-03":3.0,"2026-06-04":3.0,"2026-06-05":2.0,"2026-06-06":0.0,"2026-06-07":0.0,"2026-06-08":1.0,"2026-06-09":1.0,"2026-06-10":1.0,"2026-06-11":0.0,"2026-06-12":2.0,"2026-06-13":0.0,"2026-06-14":2.0,"2026-06-15":1.0}},"B0D5LDYQFZ|FR":{"brand":"JIGOO","model":"T600-White-New","asin":"B0D5LDYQFZ","site":"FR","sales":{"2026-05-01":0.0,"2026-05-02":0.0,"2026-05-03":0.0,"2026-05-04":0.0,"2026-05-05":0.0,"2026-05-06":0.0,"2026-05-07":0.0,"2026-05-08":0.0,"2026-05-09":0.0,"2026-05-10":0.0,"2026-05-11":0.0,"2026-05-12":0.0,"2026-05-13":0.0,"2026-05-14":0.0,"2026-05-15":0.0,"2026-05-16":0.0,"2026-05-17":0.0,"2026-05-18":0.0,"2026-05-19":0.0,"2026-05-20":0.0,"2026-05-21":0.0,"2026-05-22":0.0,"2026-05-23":0.0,"2026-05-24":0.0,"2026-05-25":0.0,"2026-05-26":0.0,"2026-05-27":1.0,"2026-05-28":0.0,"2026-05-29":0.0,"2026-05-30":0.0,"2026-05-31":0.0,"2026-06-01":1.0,"2026-06-02":0.0,"2026-06-03":0.0,"2026-06-04":0.0,"2026-06-05":0.0,"2026-06-06":0.0,"2026-06-07":0.0,"2026-06-08":0.0,"2026-06-09":1.0,"2026-06-10":0.0,"2026-06-11":0.0,"2026-06-12":0.0,"2026-06-13":0.0,"2026-06-14":0.0,"2026-06-15":0.0,"2026-06-16":0.0,"2026-06-17":0.0},"gv":{"2026-05-01":0.0,"2026-05-02":0.0,"2026-05-03":0.0,"2026-05-04":0.0,"2026-05-05":0.0,"2026-05-06":0.0,"2026-05-07":0.0,"2026-05-08":0.0,"2026-05-09":1.0,"2026-05-10":0.0,"2026-05-11":0.0,"2026-05-12":5.0,"2026-05-13":2.0,"2026-05-14":1.0,"2026-05-15":0.0,"2026-05-16":6.0,"2026-05-17":4.0,"2026-05-18":0.0,"2026-05-19":3.0,"2026-05-20":3.0,"2026-05-21":0.0,"2026-05-22":1.0,"2026-05-23":1.0,"2026-05-24":1.0,"2026-05-25":1.0,"2026-05-26":0.0,"2026-05-27":1.0,"2026-05-28":2.0,"2026-05-29":0.0,"2026-05-30":3.0,"2026-05-31":7.0,"2026-06-01":3.0,"2026-06-02":1.0,"2026-06-03":0.0,"2026-06-04":0.0,"2026-06-05":1.0,"2026-06-06":1.0,"2026-06-07":1.0,"2026-06-08":6.0,"2026-06-09":3.0,"2026-06-10":0.0,"2026-06-11":1.0,"2026-06-12":3.0,"2026-06-13":2.0,"2026-06-14":3.0,"2026-06-15":1.0}},"B0D5LDYQFZ|IT":{"brand":"JIGOO","model":"T600-White-New","asin":"B0D5LDYQFZ","site":"IT","sales":{"2026-05-01":0.0,"2026-05-02":0.0,"2026-05-03":0.0,"2026-05-04":0.0,"2026-05-05":0.0,"2026-05-06":0.0,"2026-05-07":0.0,"2026-05-08":0.0,"2026-05-09":0.0,"2026-05-10":0.0,"2026-05-11":0.0,"2026-05-12":0.0,"2026-05-13":0.0,"2026-05-14":1.0,"2026-05-15":0.0,"2026-05-16":0.0,"2026-05-17":0.0,"2026-05-18":0.0,"2026-05-19":0.0,"2026-05-20":0.0,"2026-05-21":0.0,"2026-05-22":1.0,"2026-05-23":0.0,"2026-05-24":1.0,"2026-05-25":2.0,"2026-05-26":0.0,"2026-05-27":0.0,"2026-05-28":1.0,"2026-05-29":1.0,"2026-05-30":0.0,"2026-05-31":1.0,"2026-06-01":0.0,"2026-06-02":0.0,"2026-06-03":0.0,"2026-06-04":0.0,"2026-06-05":0.0,"2026-06-06":1.0,"2026-06-07":0.0,"2026-06-08":0.0,"2026-06-09":0.0,"2026-06-10":0.0,"2026-06-11":1.0,"2026-06-12":0.0,"2026-06-13":0.0,"2026-06-14":0.0,"2026-06-15":0.0,"2026-06-16":0.0,"2026-06-17":0.0},"gv":{"2026-05-01":0.0,"2026-05-02":0.0,"2026-05-03":0.0,"2026-05-04":0.0,"2026-05-05":0.0,"2026-05-06":0.0,"2026-05-07":0.0,"2026-05-08":0.0,"2026-05-09":0.0,"2026-05-10":0.0,"2026-05-11":0.0,"2026-05-12":23.0,"2026-05-13":11.0,"2026-05-14":31.0,"2026-05-15":14.0,"2026-05-16":9.0,"2026-05-17":15.0,"2026-05-18":14.0,"2026-05-19":8.0,"2026-05-20":9.0,"2026-05-21":12.0,"2026-05-22":7.0,"2026-05-23":9.0,"2026-05-24":14.0,"2026-05-25":19.0,"2026-05-26":17.0,"2026-05-27":14.0,"2026-05-28":14.0,"2026-05-29":14.0,"2026-05-30":4.0,"2026-05-31":8.0,"2026-06-01":9.0,"2026-06-02":21.0,"2026-06-03":7.0,"2026-06-04":26.0,"2026-06-05":8.0,"2026-06-06":8.0,"2026-06-07":21.0,"2026-06-08":18.0,"2026-06-09":10.0,"2026-06-10":5.0,"2026-06-11":4.0,"2026-06-12":5.0,"2026-06-13":5.0,"2026-06-14":12.0,"2026-06-15":9.0}},"B0D5LDYQFZ|ES":{"brand":"JIGOO","model":"T600-White-New","asin":"B0D5LDYQFZ","site":"ES","sales":{"2026-05-01":0.0,"2026-05-02":0.0,"2026-05-03":0.0,"2026-05-04":0.0,"2026-05-05":0.0,"2026-05-06":0.0,"2026-05-07":0.0,"2026-05-08":0.0,"2026-05-09":0.0,"2026-05-10":0.0,"2026-05-11":0.0,"2026-05-12":0.0,"2026-05-13":0.0,"2026-05-14":0.0,"2026-05-15":0.0,"2026-05-16":0.0,"2026-05-17":0.0,"2026-05-18":0.0,"2026-05-19":0.0,"2026-05-20":0.0,"2026-05-21":0.0,"2026-05-22":0.0,"2026-05-23":0.0,"2026-05-24":1.0,"2026-05-25":0.0,"2026-05-26":1.0,"2026-05-27":4.0,"2026-05-28":0.0,"2026-05-29":1.0,"2026-05-30":1.0,"2026-05-31":0.0,"2026-06-01":0.0,"2026-06-02":0.0,"2026-06-03":0.0,"2026-06-04":0.0,"2026-06-05":0.0,"2026-06-06":0.0,"2026-06-07":0.0,"2026-06-08":0.0,"2026-06-09":0.0,"2026-06-10":0.0,"2026-06-11":0.0,"2026-06-12":0.0,"2026-06-13":0.0,"2026-06-14":0.0,"2026-06-15":0.0,"2026-06-16":0.0,"2026-06-17":0.0},"gv":{"2026-05-01":0.0,"2026-05-02":0.0,"2026-05-03":0.0,"2026-05-04":0.0,"2026-05-05":0.0,"2026-05-06":3.0,"2026-05-07":0.0,"2026-05-08":0.0,"2026-05-09":0.0,"2026-05-10":1.0,"2026-05-11":1.0,"2026-05-12":10.0,"2026-05-13":6.0,"2026-05-14":5.0,"2026-05-15":10.0,"2026-05-16":16.0,"2026-05-17":1.0,"2026-05-18":6.0,"2026-05-19":8.0,"2026-05-20":5.0,"2026-05-21":9.0,"2026-05-22":9.0,"2026-05-23":2.0,"2026-05-24":21.0,"2026-05-25":10.0,"2026-05-26":16.0,"2026-05-27":17.0,"2026-05-28":15.0,"2026-05-29":11.0,"2026-05-30":6.0,"2026-05-31":14.0,"2026-06-01":7.0,"2026-06-02":2.0,"2026-06-03":6.0,"2026-06-04":3.0,"2026-06-05":9.0,"2026-06-06":11.0,"2026-06-07":7.0,"2026-06-08":13.0,"2026-06-09":12.0,"2026-06-10":7.0,"2026-06-11":1.0,"2026-06-12":11.0,"2026-06-13":2.0,"2026-06-14":4.0,"2026-06-15":11.0}},"B0CJ9FL94H|DE":{"brand":"JIGOO","model":"J300","asin":"B0CJ9FL94H","site":"DE","sales":{"2026-05-01":0.0,"2026-05-02":1.0,"2026-05-03":0.0,"2026-05-04":0.0,"2026-05-05":1.0,"2026-05-06":0.0,"2026-05-07":0.0,"2026-05-08":3.0,"2026-05-09":0.0,"2026-05-10":3.0,"2026-05-11":4.0,"2026-05-12":4.0,"2026-05-13":2.0,"2026-05-14":5.0,"2026-05-15":7.0,"2026-05-16":3.0,"2026-05-17":3.0,"2026-05-18":6.0,"2026-05-19":2.0,"2026-05-20":6.0,"2026-05-21":3.0,"2026-05-22":4.0,"2026-05-23":0.0,"2026-05-24":2.0,"2026-05-25":1.0,"2026-05-26":0.0,"2026-05-27":1.0,"2026-05-28":2.0,"2026-05-29":5.0,"2026-05-30":2.0,"2026-05-31":4.0,"2026-06-01":3.0,"2026-06-02":3.0,"2026-06-03":0.0,"2026-06-04":7.0,"2026-06-05":5.0,"2026-06-06":3.0,"2026-06-07":9.0,"2026-06-08":10.0,"2026-06-09":5.0,"2026-06-10":4.0,"2026-06-11":5.0,"2026-06-12":6.0,"2026-06-13":4.0,"2026-06-14":3.0,"2026-06-15":17.0,"2026-06-16":13.0,"2026-06-17":7.0},"gv":{"2026-05-01":1.0,"2026-05-02":26.0,"2026-05-03":29.0,"2026-05-04":5.0,"2026-05-05":2.0,"2026-05-06":3.0,"2026-05-07":3.0,"2026-05-08":39.0,"2026-05-09":117.0,"2026-05-10":184.0,"2026-05-11":152.0,"2026-05-12":156.0,"2026-05-13":131.0,"2026-05-14":239.0,"2026-05-15":155.0,"2026-05-16":180.0,"2026-05-17":198.0,"2026-05-18":214.0,"2026-05-19":219.0,"2026-05-20":189.0,"2026-05-21":168.0,"2026-05-22":131.0,"2026-05-23":92.0,"2026-05-24":124.0,"2026-05-25":149.0,"2026-05-26":86.0,"2026-05-27":82.0,"2026-05-28":174.0,"2026-05-29":293.0,"2026-05-30":136.0,"2026-05-31":220.0,"2026-06-01":162.0,"2026-06-02":151.0,"2026-06-03":153.0,"2026-06-04":388.0,"2026-06-05":220.0,"2026-06-06":151.0,"2026-06-07":264.0,"2026-06-08":185.0,"2026-06-09":179.0,"2026-06-10":218.0,"2026-06-11":401.0,"2026-06-12":438.0,"2026-06-13":197.0,"2026-06-14":208.0,"2026-06-15":404.0}},"B0CJ9FL94H|FR":{"brand":"JIGOO","model":"J300","asin":"B0CJ9FL94H","site":"FR","sales":{"2026-05-01":0.0,"2026-05-02":1.0,"2026-05-03":0.0,"2026-05-04":0.0,"2026-05-05":0.0,"2026-05-06":0.0,"2026-05-07":0.0,"2026-05-08":0.0,"2026-05-09":0.0,"2026-05-10":1.0,"2026-05-11":0.0,"2026-05-12":1.0,"2026-05-13":0.0,"2026-05-14":0.0,"2026-05-15":0.0,"2026-05-16":0.0,"2026-05-17":0.0,"2026-05-18":1.0,"2026-05-19":0.0,"2026-05-20":0.0,"2026-05-21":1.0,"2026-05-22":0.0,"2026-05-23":1.0,"2026-05-24":1.0,"2026-05-25":2.0,"2026-05-26":0.0,"2026-05-27":1.0,"2026-05-28":0.0,"2026-05-29":0.0,"2026-05-30":2.0,"2026-05-31":2.0,"2026-06-01":1.0,"2026-06-02":4.0,"2026-06-03":2.0,"2026-06-04":3.0,"2026-06-05":1.0,"2026-06-06":0.0,"2026-06-07":1.0,"2026-06-08":1.0,"2026-06-09":1.0,"2026-06-10":2.0,"2026-06-11":2.0,"2026-06-12":3.0,"2026-06-13":1.0,"2026-06-14":3.0,"2026-06-15":1.0,"2026-06-16":0.0,"2026-06-17":2.0},"gv":{"2026-05-01":0.0,"2026-05-02":4.0,"2026-05-03":0.0,"2026-05-04":0.0,"2026-05-05":0.0,"2026-05-06":0.0,"2026-05-07":0.0,"2026-05-08":2.0,"2026-05-09":13.0,"2026-05-10":26.0,"2026-05-11":21.0,"2026-05-12":22.0,"2026-05-13":7.0,"2026-05-14":14.0,"2026-05-15":28.0,"2026-05-16":31.0,"2026-05-17":18.0,"2026-05-18":16.0,"2026-05-19":24.0,"2026-05-20":17.0,"2026-05-21":23.0,"2026-05-22":9.0,"2026-05-23":12.0,"2026-05-24":26.0,"2026-05-25":24.0,"2026-05-26":12.0,"2026-05-27":21.0,"2026-05-28":12.0,"2026-05-29":21.0,"2026-05-30":51.0,"2026-05-31":54.0,"2026-06-01":54.0,"2026-06-02":47.0,"2026-06-03":73.0,"2026-06-04":36.0,"2026-06-05":34.0,"2026-06-06":44.0,"2026-06-07":47.0,"2026-06-08":33.0,"2026-06-09":39.0,"2026-06-10":32.0,"2026-06-11":41.0,"2026-06-12":21.0,"2026-06-13":47.0,"2026-06-14":34.0,"2026-06-15":36.0}},"B0CJ9FL94H|IT":{"brand":"JIGOO","model":"J300","asin":"B0CJ9FL94H","site":"IT","sales":{"2026-05-01":0.0,"2026-05-02":1.0,"2026-05-03":0.0,"2026-05-04":0.0,"2026-05-05":0.0,"2026-05-06":0.0,"2026-05-07":0.0,"2026-05-08":0.0,"2026-05-09":0.0,"2026-05-10":0.0,"2026-05-11":0.0,"2026-05-12":0.0,"2026-05-13":0.0,"2026-05-14":0.0,"2026-05-15":0.0,"2026-05-16":0.0,"2026-05-17":0.0,"2026-05-18":0.0,"2026-05-19":0.0,"2026-05-20":0.0,"2026-05-21":0.0,"2026-05-22":1.0,"2026-05-23":3.0,"2026-05-24":1.0,"2026-05-25":4.0,"2026-05-26":1.0,"2026-05-27":0.0,"2026-05-28":0.0,"2026-05-29":0.0,"2026-05-30":0.0,"2026-05-31":0.0,"2026-06-01":0.0,"2026-06-02":2.0,"2026-06-03":3.0,"2026-06-04":3.0,"2026-06-05":1.0,"2026-06-06":4.0,"2026-06-07":4.0,"2026-06-08":5.0,"2026-06-09":9.0,"2026-06-10":5.0,"2026-06-11":7.0,"2026-06-12":-2.0,"2026-06-13":0.0,"2026-06-14":3.0,"2026-06-15":4.0,"2026-06-16":0.0,"2026-06-17":3.0},"gv":{"2026-05-01":1.0,"2026-05-02":51.0,"2026-05-03":31.0,"2026-05-04":0.0,"2026-05-05":2.0,"2026-05-06":0.0,"2026-05-07":0.0,"2026-05-08":0.0,"2026-05-09":0.0,"2026-05-10":0.0,"2026-05-11":0.0,"2026-05-12":46.0,"2026-05-13":0.0,"2026-05-14":0.0,"2026-05-15":0.0,"2026-05-16":0.0,"2026-05-17":0.0,"2026-05-18":0.0,"2026-05-19":0.0,"2026-05-20":0.0,"2026-05-21":0.0,"2026-05-22":61.0,"2026-05-23":284.0,"2026-05-24":460.0,"2026-05-25":160.0,"2026-05-26":7.0,"2026-05-27":9.0,"2026-05-28":2.0,"2026-05-29":40.0,"2026-05-30":1.0,"2026-05-31":0.0,"2026-06-01":24.0,"2026-06-02":52.0,"2026-06-03":200.0,"2026-06-04":175.0,"2026-06-05":426.0,"2026-06-06":381.0,"2026-06-07":181.0,"2026-06-08":134.0,"2026-06-09":186.0,"2026-06-10":172.0,"2026-06-11":236.0,"2026-06-12":175.0,"2026-06-13":112.0,"2026-06-14":206.0,"2026-06-15":216.0}},"B0CJ9FL94H|ES":{"brand":"JIGOO","model":"J300","asin":"B0CJ9FL94H","site":"ES","sales":{"2026-05-01":0.0,"2026-05-02":0.0,"2026-05-03":1.0,"2026-05-04":0.0,"2026-05-05":0.0,"2026-05-06":0.0,"2026-05-07":0.0,"2026-05-08":0.0,"2026-05-09":0.0,"2026-05-10":0.0,"2026-05-11":0.0,"2026-05-12":0.0,"2026-05-13":0.0,"2026-05-14":0.0,"2026-05-15":0.0,"2026-05-16":0.0,"2026-05-17":0.0,"2026-05-18":0.0,"2026-05-19":0.0,"2026-05-20":0.0,"2026-05-21":0.0,"2026-05-22":0.0,"2026-05-23":0.0,"2026-05-24":1.0,"2026-05-25":0.0,"2026-05-26":0.0,"2026-05-27":0.0,"2026-05-28":0.0,"2026-05-29":0.0,"2026-05-30":0.0,"2026-05-31":0.0,"2026-06-01":0.0,"2026-06-02":0.0,"2026-06-03":0.0,"2026-06-04":0.0,"2026-06-05":4.0,"2026-06-06":2.0,"2026-06-07":0.0,"2026-06-08":0.0,"2026-06-09":0.0,"2026-06-10":0.0,"2026-06-11":1.0,"2026-06-12":0.0,"2026-06-13":0.0,"2026-06-14":0.0,"2026-06-15":0.0,"2026-06-16":1.0,"2026-06-17":0.0},"gv":{"2026-05-01":0.0,"2026-05-02":20.0,"2026-05-03":18.0,"2026-05-04":1.0,"2026-05-05":6.0,"2026-05-06":0.0,"2026-05-07":0.0,"2026-05-08":0.0,"2026-05-09":0.0,"2026-05-10":0.0,"2026-05-11":0.0,"2026-05-12":32.0,"2026-05-13":0.0,"2026-05-14":0.0,"2026-05-15":0.0,"2026-05-16":0.0,"2026-05-17":0.0,"2026-05-18":0.0,"2026-05-19":0.0,"2026-05-20":0.0,"2026-05-21":0.0,"2026-05-22":0.0,"2026-05-23":0.0,"2026-05-24":35.0,"2026-05-25":0.0,"2026-05-26":0.0,"2026-05-27":0.0,"2026-05-28":0.0,"2026-05-29":0.0,"2026-05-30":0.0,"2026-05-31":0.0,"2026-06-01":0.0,"2026-06-02":0.0,"2026-06-03":0.0,"2026-06-04":0.0,"2026-06-05":95.0,"2026-06-06":47.0,"2026-06-07":7.0,"2026-06-08":6.0,"2026-06-09":21.0,"2026-06-10":7.0,"2026-06-11":12.0,"2026-06-12":0.0,"2026-06-13":0.0,"2026-06-14":0.0,"2026-06-15":38.0}},"B0DKY6RQRC|DE":{"brand":"JIGOO","model":"S100","asin":"B0DKY6RQRC","site":"DE","sales":{"2026-05-01":0.0,"2026-05-02":0.0,"2026-05-03":0.0,"2026-05-04":0.0,"2026-05-05":0.0,"2026-05-06":0.0,"2026-05-07":0.0,"2026-05-08":0.0,"2026-05-09":0.0,"2026-05-10":0.0,"2026-05-11":0.0,"2026-05-12":0.0,"2026-05-13":0.0,"2026-05-14":0.0,"2026-05-15":0.0,"2026-05-16":0.0,"2026-05-17":0.0,"2026-05-18":0.0,"2026-05-19":0.0,"2026-05-20":0.0,"2026-05-21":0.0,"2026-05-22":0.0,"2026-05-23":0.0,"2026-05-24":0.0,"2026-05-25":0.0,"2026-05-26":0.0,"2026-05-27":0.0,"2026-05-28":0.0,"2026-05-29":0.0,"2026-05-30":0.0,"2026-05-31":0.0,"2026-06-01":0.0,"2026-06-02":0.0,"2026-06-03":0.0,"2026-06-04":0.0,"2026-06-05":0.0,"2026-06-06":0.0,"2026-06-07":0.0,"2026-06-08":0.0,"2026-06-09":0.0,"2026-06-10":0.0,"2026-06-11":0.0,"2026-06-12":0.0,"2026-06-13":1.0,"2026-06-14":1.0,"2026-06-15":0.0,"2026-06-16":0.0,"2026-06-17":0.0},"gv":{"2026-05-01":0.0,"2026-05-02":0.0,"2026-05-03":0.0,"2026-05-04":0.0,"2026-05-05":0.0,"2026-05-06":0.0,"2026-05-07":0.0,"2026-05-08":0.0,"2026-05-09":0.0,"2026-05-10":0.0,"2026-05-11":0.0,"2026-05-12":0.0,"2026-05-13":0.0,"2026-05-14":0.0,"2026-05-15":0.0,"2026-05-16":0.0,"2026-05-17":0.0,"2026-05-18":0.0,"2026-05-19":0.0,"2026-05-20":0.0,"2026-05-21":0.0,"2026-05-22":0.0,"2026-05-23":0.0,"2026-05-24":0.0,"2026-05-25":0.0,"2026-05-26":0.0,"2026-05-27":1.0,"2026-05-28":1.0,"2026-05-29":1.0,"2026-05-30":0.0,"2026-05-31":0.0,"2026-06-01":0.0,"2026-06-02":0.0,"2026-06-03":0.0,"2026-06-04":0.0,"2026-06-05":0.0,"2026-06-06":0.0,"2026-06-07":0.0,"2026-06-08":0.0,"2026-06-09":0.0,"2026-06-10":0.0,"2026-06-11":0.0,"2026-06-12":12.0,"2026-06-13":14.0,"2026-06-14":18.0,"2026-06-15":14.0}},"B0DKY6RQRC|FR":{"brand":"JIGOO","model":"S100","asin":"B0DKY6RQRC","site":"FR","sales":{"2026-05-01":0.0,"2026-05-02":0.0,"2026-05-03":0.0,"2026-05-04":0.0,"2026-05-05":0.0,"2026-05-06":0.0,"2026-05-07":0.0,"2026-05-08":0.0,"2026-05-09":0.0,"2026-05-10":0.0,"2026-05-11":0.0,"2026-05-12":0.0,"2026-05-13":0.0,"2026-05-14":0.0,"2026-05-15":0.0,"2026-05-16":0.0,"2026-05-17":0.0,"2026-05-18":0.0,"2026-05-19":0.0,"2026-05-20":0.0,"2026-05-21":0.0,"2026-05-22":0.0,"2026-05-23":0.0,"2026-05-24":0.0,"2026-05-25":0.0,"2026-05-26":0.0,"2026-05-27":0.0,"2026-05-28":0.0,"2026-05-29":0.0,"2026-05-30":0.0,"2026-05-31":0.0,"2026-06-01":0.0,"2026-06-02":0.0,"2026-06-03":0.0,"2026-06-04":0.0,"2026-06-05":0.0,"2026-06-06":0.0,"2026-06-07":0.0,"2026-06-08":0.0,"2026-06-09":0.0,"2026-06-10":0.0,"2026-06-11":0.0,"2026-06-12":0.0,"2026-06-13":0.0,"2026-06-14":0.0,"2026-06-15":0.0,"2026-06-16":0.0,"2026-06-17":3.0},"gv":{"2026-05-01":0.0,"2026-05-02":0.0,"2026-05-03":0.0,"2026-05-04":0.0,"2026-05-05":0.0,"2026-05-06":0.0,"2026-05-07":0.0,"2026-05-08":0.0,"2026-05-09":0.0,"2026-05-10":0.0,"2026-05-11":0.0,"2026-05-12":0.0,"2026-05-13":0.0,"2026-05-14":0.0,"2026-05-15":0.0,"2026-05-16":0.0,"2026-05-17":0.0,"2026-05-18":0.0,"2026-05-19":0.0,"2026-05-20":0.0,"2026-05-21":0.0,"2026-05-22":0.0,"2026-05-23":0.0,"2026-05-24":0.0,"2026-05-25":0.0,"2026-05-26":5.0,"2026-05-27":50.0,"2026-05-28":47.0,"2026-05-29":41.0,"2026-05-30":0.0,"2026-05-31":0.0,"2026-06-01":0.0,"2026-06-02":0.0,"2026-06-03":0.0,"2026-06-04":0.0,"2026-06-05":0.0,"2026-06-06":0.0,"2026-06-07":0.0,"2026-06-08":0.0,"2026-06-09":0.0,"2026-06-10":0.0,"2026-06-11":1.0,"2026-06-12":0.0,"2026-06-13":4.0,"2026-06-14":0.0,"2026-06-15":0.0}},"B0DKY6RQRC|IT":{"brand":"JIGOO","model":"S100","asin":"B0DKY6RQRC","site":"IT","sales":{"2026-05-01":0.0,"2026-05-02":0.0,"2026-05-03":0.0,"2026-05-04":0.0,"2026-05-05":0.0,"2026-05-06":0.0,"2026-05-07":0.0,"2026-05-08":0.0,"2026-05-09":0.0,"2026-05-10":0.0,"2026-05-11":0.0,"2026-05-12":0.0,"2026-05-13":0.0,"2026-05-14":0.0,"2026-05-15":0.0,"2026-05-16":0.0,"2026-05-17":0.0,"2026-05-18":0.0,"2026-05-19":0.0,"2026-05-20":0.0,"2026-05-21":0.0,"2026-05-22":0.0,"2026-05-23":0.0,"2026-05-24":0.0,"2026-05-25":0.0,"2026-05-26":0.0,"2026-05-27":0.0,"2026-05-28":0.0,"2026-05-29":0.0,"2026-05-30":0.0,"2026-05-31":0.0,"2026-06-01":0.0,"2026-06-02":0.0,"2026-06-03":0.0,"2026-06-04":0.0,"2026-06-05":0.0,"2026-06-06":0.0,"2026-06-07":0.0,"2026-06-08":0.0,"2026-06-09":0.0,"2026-06-10":0.0,"2026-06-11":0.0,"2026-06-12":0.0,"2026-06-13":0.0,"2026-06-14":0.0,"2026-06-15":0.0,"2026-06-16":0.0,"2026-06-17":0.0},"gv":{"2026-05-01":0.0,"2026-05-02":0.0,"2026-05-03":0.0,"2026-05-04":0.0,"2026-05-05":0.0,"2026-05-06":0.0,"2026-05-07":0.0,"2026-05-08":0.0,"2026-05-09":0.0,"2026-05-10":0.0,"2026-05-11":0.0,"2026-05-12":0.0,"2026-05-13":0.0,"2026-05-14":0.0,"2026-05-15":0.0,"2026-05-16":0.0,"2026-05-17":0.0,"2026-05-18":0.0,"2026-05-19":0.0,"2026-05-20":0.0,"2026-05-21":0.0,"2026-05-22":0.0,"2026-05-23":0.0,"2026-05-24":0.0,"2026-05-25":0.0,"2026-05-26":13.0,"2026-05-27":118.0,"2026-05-28":96.0,"2026-05-29":77.0,"2026-05-30":0.0,"2026-05-31":0.0,"2026-06-01":0.0,"2026-06-02":0.0,"2026-06-03":0.0,"2026-06-04":0.0,"2026-06-05":0.0,"2026-06-06":0.0,"2026-06-07":0.0,"2026-06-08":0.0,"2026-06-09":0.0,"2026-06-10":0.0,"2026-06-11":0.0,"2026-06-12":0.0,"2026-06-13":0.0,"2026-06-14":0.0,"2026-06-15":2.0}},"B0DKY6RQRC|ES":{"brand":"JIGOO","model":"S100","asin":"B0DKY6RQRC","site":"ES","sales":{"2026-05-01":0.0,"2026-05-02":0.0,"2026-05-03":0.0,"2026-05-04":0.0,"2026-05-05":0.0,"2026-05-06":0.0,"2026-05-07":0.0,"2026-05-08":0.0,"2026-05-09":0.0,"2026-05-10":0.0,"2026-05-11":0.0,"2026-05-12":0.0,"2026-05-13":0.0,"2026-05-14":0.0,"2026-05-15":0.0,"2026-05-16":0.0,"2026-05-17":0.0,"2026-05-18":0.0,"2026-05-19":0.0,"2026-05-20":0.0,"2026-05-21":0.0,"2026-05-22":0.0,"2026-05-23":0.0,"2026-05-24":0.0,"2026-05-25":0.0,"2026-05-26":0.0,"2026-05-27":0.0,"2026-05-28":0.0,"2026-05-29":0.0,"2026-05-30":0.0,"2026-05-31":0.0,"2026-06-01":0.0,"2026-06-02":0.0,"2026-06-03":0.0,"2026-06-04":0.0,"2026-06-05":0.0,"2026-06-06":0.0,"2026-06-07":0.0,"2026-06-08":0.0,"2026-06-09":0.0,"2026-06-10":0.0,"2026-06-11":0.0,"2026-06-12":0.0,"2026-06-13":0.0,"2026-06-14":0.0,"2026-06-15":0.0,"2026-06-16":1.0,"2026-06-17":1.0},"gv":{"2026-05-01":0.0,"2026-05-02":0.0,"2026-05-03":0.0,"2026-05-04":0.0,"2026-05-05":0.0,"2026-05-06":0.0,"2026-05-07":0.0,"2026-05-08":0.0,"2026-05-09":0.0,"2026-05-10":0.0,"2026-05-11":0.0,"2026-05-12":0.0,"2026-05-13":0.0,"2026-05-14":0.0,"2026-05-15":0.0,"2026-05-16":0.0,"2026-05-17":0.0,"2026-05-18":0.0,"2026-05-19":0.0,"2026-05-20":0.0,"2026-05-21":0.0,"2026-05-22":0.0,"2026-05-23":0.0,"2026-05-24":0.0,"2026-05-25":0.0,"2026-05-26":9.0,"2026-05-27":59.0,"2026-05-28":41.0,"2026-05-29":22.0,"2026-05-30":0.0,"2026-05-31":0.0,"2026-06-01":0.0,"2026-06-02":0.0,"2026-06-03":0.0,"2026-06-04":0.0,"2026-06-05":0.0,"2026-06-06":0.0,"2026-06-07":0.0,"2026-06-08":0.0,"2026-06-09":0.0,"2026-06-10":0.0,"2026-06-11":0.0,"2026-06-12":0.0,"2026-06-13":0.0,"2026-06-14":0.0,"2026-06-15":0.0}},"B0DKY6RQRC|US":{"brand":"JIGOO","model":"S100","asin":"B0DKY6RQRC","site":"US","sales":{},"gv":{}},"B0BP6HQ38B|US":{"brand":"JIMMY","model":"JV35","asin":"B0BP6HQ38B","site":"US","sales":{"2026-05-01":0.0,"2026-05-02":0.0,"2026-05-03":0.0,"2026-05-04":0.0,"2026-05-05":0.0,"2026-05-06":0.0,"2026-05-07":0.0,"2026-05-08":0.0,"2026-05-09":0.0,"2026-05-10":0.0,"2026-05-11":0.0,"2026-05-12":0.0,"2026-05-13":0.0,"2026-05-14":0.0,"2026-05-15":0.0,"2026-05-16":0.0,"2026-05-17":0.0,"2026-05-18":0.0,"2026-05-19":0.0,"2026-05-20":0.0,"2026-05-21":0.0,"2026-05-22":0.0,"2026-05-23":0.0,"2026-05-24":0.0,"2026-05-25":0.0,"2026-05-26":0.0,"2026-05-27":0.0,"2026-05-28":0.0,"2026-05-29":0.0,"2026-05-30":0.0,"2026-05-31":0.0,"2026-06-01":0.0,"2026-06-02":0.0,"2026-06-03":0.0,"2026-06-04":0.0,"2026-06-05":0.0,"2026-06-06":0.0,"2026-06-07":0.0,"2026-06-08":0.0,"2026-06-09":0.0,"2026-06-10":0.0,"2026-06-11":0.0,"2026-06-12":0.0,"2026-06-13":0.0,"2026-06-14":0.0,"2026-06-15":0.0,"2026-06-16":0.0,"2026-06-17":0.0},"gv":{"2026-05-01":0.0,"2026-05-02":0.0,"2026-05-03":0.0,"2026-05-04":0.0,"2026-05-05":0.0,"2026-05-06":0.0,"2026-05-07":0.0,"2026-05-08":0.0,"2026-05-09":0.0,"2026-05-10":0.0,"2026-05-11":0.0,"2026-05-12":0.0,"2026-05-13":0.0,"2026-05-14":0.0,"2026-05-15":0.0,"2026-05-16":0.0,"2026-05-17":0.0,"2026-05-18":0.0,"2026-05-19":0.0,"2026-05-20":0.0,"2026-05-21":0.0,"2026-05-22":0.0,"2026-05-23":0.0,"2026-05-24":0.0,"2026-05-25":0.0,"2026-05-26":0.0,"2026-05-27":0.0,"2026-05-28":0.0,"2026-05-29":0.0,"2026-05-30":0.0,"2026-05-31":0.0,"2026-06-01":0.0,"2026-06-02":0.0,"2026-06-03":0.0,"2026-06-04":0.0,"2026-06-05":0.0,"2026-06-06":0.0,"2026-06-07":0.0,"2026-06-08":0.0,"2026-06-09":0.0,"2026-06-10":0.0,"2026-06-11":0.0,"2026-06-12":0.0,"2026-06-13":0.0,"2026-06-14":0.0,"2026-06-15":0.0,"2026-06-16":0.0,"2026-06-17":0.0}},"B0CPDXHHR2|US":{"brand":"JIMMY","model":"BX5 PRO","asin":"B0CPDXHHR2","site":"US","sales":{"2026-05-01":0.0,"2026-05-02":0.0,"2026-05-03":0.0,"2026-05-04":0.0,"2026-05-05":0.0,"2026-05-06":0.0,"2026-05-07":0.0,"2026-05-08":0.0,"2026-05-09":0.0,"2026-05-10":0.0,"2026-05-11":0.0,"2026-05-12":0.0,"2026-05-13":0.0,"2026-05-14":0.0,"2026-05-15":0.0,"2026-05-16":0.0,"2026-05-17":0.0,"2026-05-18":0.0,"2026-05-19":0.0,"2026-05-20":0.0,"2026-05-21":0.0,"2026-05-22":0.0,"2026-05-23":0.0,"2026-05-24":0.0,"2026-05-25":0.0,"2026-05-26":0.0,"2026-05-27":0.0,"2026-05-28":0.0,"2026-05-29":0.0,"2026-05-30":0.0,"2026-05-31":0.0,"2026-06-01":0.0,"2026-06-02":0.0,"2026-06-03":0.0,"2026-06-04":0.0,"2026-06-05":0.0,"2026-06-06":0.0,"2026-06-07":0.0,"2026-06-08":0.0,"2026-06-09":0.0,"2026-06-10":0.0,"2026-06-11":1.0,"2026-06-12":0.0,"2026-06-13":0.0,"2026-06-14":0.0,"2026-06-15":0.0,"2026-06-16":0.0,"2026-06-17":0.0},"gv":{"2026-05-01":0.0,"2026-05-02":0.0,"2026-05-03":0.0,"2026-05-04":0.0,"2026-05-05":0.0,"2026-05-06":0.0,"2026-05-07":0.0,"2026-05-08":0.0,"2026-05-09":0.0,"2026-05-10":0.0,"2026-05-11":0.0,"2026-05-12":0.0,"2026-05-13":0.0,"2026-05-14":0.0,"2026-05-15":0.0,"2026-05-16":0.0,"2026-05-17":0.0,"2026-05-18":0.0,"2026-05-19":0.0,"2026-05-20":0.0,"2026-05-21":0.0,"2026-05-22":0.0,"2026-05-23":0.0,"2026-05-24":0.0,"2026-05-25":0.0,"2026-05-26":0.0,"2026-05-27":0.0,"2026-05-28":0.0,"2026-05-29":0.0,"2026-05-30":0.0,"2026-05-31":0.0,"2026-06-01":0.0,"2026-06-02":0.0,"2026-06-03":0.0,"2026-06-04":0.0,"2026-06-05":0.0,"2026-06-06":0.0,"2026-06-07":0.0,"2026-06-08":0.0,"2026-06-09":0.0,"2026-06-10":0.0,"2026-06-11":0.0,"2026-06-12":0.0,"2026-06-13":0.0,"2026-06-14":0.0,"2026-06-15":0.0,"2026-06-16":0.0,"2026-06-17":0.0}},"B0F65XP5NZ|US":{"brand":"JIMMY","model":"BX7 PRO","asin":"B0F65XP5NZ","site":"US","sales":{"2026-05-01":4.0,"2026-05-02":3.0,"2026-05-03":14.0,"2026-05-04":9.0,"2026-05-05":13.0,"2026-05-06":10.0,"2026-05-07":8.0,"2026-05-08":5.0,"2026-05-09":11.0,"2026-05-10":11.0,"2026-05-11":15.0,"2026-05-12":1.0,"2026-05-13":11.0,"2026-05-14":14.0,"2026-05-15":10.0,"2026-05-16":10.0,"2026-05-17":12.0,"2026-05-18":6.0,"2026-05-19":9.0,"2026-05-20":8.0,"2026-05-21":8.0,"2026-05-22":15.0,"2026-05-23":14.0,"2026-05-24":17.0,"2026-05-25":10.0,"2026-05-26":7.0,"2026-05-27":10.0,"2026-05-28":6.0,"2026-05-29":11.0,"2026-05-30":16.0,"2026-05-31":19.0,"2026-06-01":13.0,"2026-06-02":7.0,"2026-06-03":9.0,"2026-06-04":8.0,"2026-06-05":9.0,"2026-06-06":12.0,"2026-06-07":16.0,"2026-06-08":10.0,"2026-06-09":13.0,"2026-06-10":11.0,"2026-06-11":13.0,"2026-06-12":5.0,"2026-06-13":12.0,"2026-06-14":2.0,"2026-06-15":10.0,"2026-06-16":2.0,"2026-06-17":7.0},"gv":{"2026-05-01":176.0,"2026-05-02":226.0,"2026-05-03":234.0,"2026-05-04":213.0,"2026-05-05":198.0,"2026-05-06":246.0,"2026-05-07":222.0,"2026-05-08":218.0,"2026-05-09":216.0,"2026-05-10":307.0,"2026-05-11":292.0,"2026-05-12":314.0,"2026-05-13":359.0,"2026-05-14":324.0,"2026-05-15":335.0,"2026-05-16":366.0,"2026-05-17":427.0,"2026-05-18":380.0,"2026-05-19":377.0,"2026-05-20":347.0,"2026-05-21":338.0,"2026-05-22":408.0,"2026-05-23":508.0,"2026-05-24":562.0,"2026-05-25":444.0,"2026-05-26":111.0,"2026-05-27":3.0,"2026-05-28":0.0,"2026-05-29":0.0,"2026-05-30":0.0,"2026-05-31":0.0,"2026-06-01":0.0,"2026-06-02":0.0,"2026-06-03":0.0,"2026-06-04":0.0,"2026-06-05":0.0,"2026-06-06":0.0,"2026-06-07":0.0,"2026-06-08":0.0,"2026-06-09":4.0,"2026-06-10":0.0,"2026-06-11":0.0,"2026-06-12":192.0,"2026-06-13":242.0,"2026-06-14":145.0,"2026-06-15":174.0,"2026-06-16":219.0,"2026-06-17":252.0}},"B0D9VVTNPR|US":{"brand":"JIMMY","model":"BX8","asin":"B0D9VVTNPR","site":"US","sales":{"2026-05-01":0.0,"2026-05-02":0.0,"2026-05-03":0.0,"2026-05-04":0.0,"2026-05-05":0.0,"2026-05-06":0.0,"2026-05-07":0.0,"2026-05-08":0.0,"2026-05-09":0.0,"2026-05-10":0.0,"2026-05-11":0.0,"2026-05-12":0.0,"2026-05-13":0.0,"2026-05-14":0.0,"2026-05-15":0.0,"2026-05-16":0.0,"2026-05-17":0.0,"2026-05-18":0.0,"2026-05-19":0.0,"2026-05-20":0.0,"2026-05-21":0.0,"2026-05-22":0.0,"2026-05-23":0.0,"2026-05-24":0.0,"2026-05-25":1.0,"2026-05-26":3.0,"2026-05-27":0.0,"2026-05-28":1.0,"2026-05-29":0.0,"2026-05-30":0.0,"2026-05-31":2.0,"2026-06-01":2.0,"2026-06-02":1.0,"2026-06-03":0.0,"2026-06-04":1.0,"2026-06-05":1.0,"2026-06-06":1.0,"2026-06-07":5.0,"2026-06-08":3.0,"2026-06-09":1.0,"2026-06-10":3.0,"2026-06-11":4.0,"2026-06-12":2.0,"2026-06-13":1.0,"2026-06-14":0.0,"2026-06-15":3.0,"2026-06-16":1.0,"2026-06-17":0.0},"gv":{"2026-05-01":0.0,"2026-05-02":0.0,"2026-05-03":0.0,"2026-05-04":0.0,"2026-05-05":0.0,"2026-05-06":0.0,"2026-05-07":0.0,"2026-05-08":0.0,"2026-05-09":0.0,"2026-05-10":0.0,"2026-05-11":0.0,"2026-05-12":0.0,"2026-05-13":0.0,"2026-05-14":0.0,"2026-05-15":0.0,"2026-05-16":0.0,"2026-05-17":0.0,"2026-05-18":0.0,"2026-05-19":0.0,"2026-05-20":0.0,"2026-05-21":0.0,"2026-05-22":1.0,"2026-05-23":13.0,"2026-05-24":32.0,"2026-05-25":23.0,"2026-05-26":13.0,"2026-05-27":0.0,"2026-05-28":0.0,"2026-05-29":0.0,"2026-05-30":0.0,"2026-05-31":0.0,"2026-06-01":0.0,"2026-06-02":0.0,"2026-06-03":0.0,"2026-06-04":0.0,"2026-06-05":0.0,"2026-06-06":0.0,"2026-06-07":0.0,"2026-06-08":0.0,"2026-06-09":1.0,"2026-06-10":0.0,"2026-06-11":0.0,"2026-06-12":36.0,"2026-06-13":45.0,"2026-06-14":16.0,"2026-06-15":26.0,"2026-06-16":59.0,"2026-06-17":77.0}},"B0FPDZD9DB|US":{"brand":"JIMMY","model":"R9","asin":"B0FPDZD9DB","site":"US","sales":{"2026-05-01":0.0,"2026-05-02":0.0,"2026-05-03":0.0,"2026-05-04":0.0,"2026-05-05":0.0,"2026-05-06":0.0,"2026-05-07":0.0,"2026-05-08":0.0,"2026-05-09":0.0,"2026-05-10":0.0,"2026-05-11":0.0,"2026-05-12":0.0,"2026-05-13":0.0,"2026-05-14":0.0,"2026-05-15":0.0,"2026-05-16":0.0,"2026-05-17":0.0,"2026-05-18":0.0,"2026-05-19":0.0,"2026-05-20":0.0,"2026-05-21":0.0,"2026-05-22":0.0,"2026-05-23":0.0,"2026-05-24":0.0,"2026-05-25":0.0,"2026-05-26":0.0,"2026-05-27":0.0,"2026-05-28":0.0,"2026-05-29":0.0,"2026-05-30":0.0,"2026-05-31":0.0,"2026-06-01":0.0,"2026-06-02":0.0,"2026-06-03":0.0,"2026-06-04":0.0,"2026-06-05":0.0,"2026-06-06":0.0,"2026-06-07":0.0,"2026-06-08":0.0,"2026-06-09":0.0,"2026-06-10":0.0,"2026-06-11":0.0,"2026-06-12":0.0,"2026-06-13":0.0,"2026-06-14":0.0,"2026-06-15":0.0,"2026-06-16":0.0,"2026-06-17":0.0},"gv":{"2026-05-01":0.0,"2026-05-02":0.0,"2026-05-03":0.0,"2026-05-04":0.0,"2026-05-05":0.0,"2026-05-06":0.0,"2026-05-07":0.0,"2026-05-08":0.0,"2026-05-09":0.0,"2026-05-10":0.0,"2026-05-11":0.0,"2026-05-12":0.0,"2026-05-13":0.0,"2026-05-14":0.0,"2026-05-15":0.0,"2026-05-16":0.0,"2026-05-17":0.0,"2026-05-18":0.0,"2026-05-19":0.0,"2026-05-20":0.0,"2026-05-21":0.0,"2026-05-22":0.0,"2026-05-23":0.0,"2026-05-24":0.0,"2026-05-25":0.0,"2026-05-26":0.0,"2026-05-27":0.0,"2026-05-28":0.0,"2026-05-29":0.0,"2026-05-30":0.0,"2026-05-31":0.0,"2026-06-01":0.0,"2026-06-02":0.0,"2026-06-03":0.0,"2026-06-04":0.0,"2026-06-05":0.0,"2026-06-06":0.0,"2026-06-07":0.0,"2026-06-08":0.0,"2026-06-09":0.0,"2026-06-10":0.0,"2026-06-11":0.0,"2026-06-12":0.0,"2026-06-13":0.0,"2026-06-14":0.0,"2026-06-15":0.0,"2026-06-16":0.0,"2026-06-17":0.0}},"B0CB3XJHSS|US":{"brand":"JIGOO","model":"J300白色","asin":"B0CB3XJHSS","site":"US","sales":{"2026-05-01":0.0,"2026-05-02":0.0,"2026-05-03":0.0,"2026-05-04":0.0,"2026-05-05":0.0,"2026-05-06":0.0,"2026-05-07":0.0,"2026-05-08":0.0,"2026-05-09":0.0,"2026-05-10":0.0,"2026-05-11":0.0,"2026-05-12":0.0,"2026-05-13":0.0,"2026-05-14":0.0,"2026-05-15":0.0,"2026-05-16":0.0,"2026-05-17":0.0,"2026-05-18":0.0,"2026-05-19":0.0,"2026-05-20":0.0,"2026-05-21":0.0,"2026-05-22":0.0,"2026-05-23":0.0,"2026-05-24":0.0,"2026-05-25":0.0,"2026-05-26":0.0,"2026-05-27":0.0,"2026-05-28":0.0,"2026-05-29":0.0,"2026-05-30":0.0,"2026-05-31":0.0,"2026-06-01":0.0,"2026-06-02":0.0,"2026-06-03":0.0,"2026-06-04":0.0,"2026-06-05":0.0,"2026-06-06":0.0,"2026-06-07":0.0,"2026-06-08":0.0,"2026-06-09":0.0,"2026-06-10":0.0,"2026-06-11":1.0,"2026-06-12":0.0,"2026-06-13":0.0,"2026-06-14":0.0,"2026-06-15":0.0,"2026-06-16":0.0,"2026-06-17":0.0},"gv":{"2026-05-01":0.0,"2026-05-02":0.0,"2026-05-03":0.0,"2026-05-04":0.0,"2026-05-05":0.0,"2026-05-06":0.0,"2026-05-07":0.0,"2026-05-08":0.0,"2026-05-09":0.0,"2026-05-10":0.0,"2026-05-11":0.0,"2026-05-12":0.0,"2026-05-13":0.0,"2026-05-14":0.0,"2026-05-15":0.0,"2026-05-16":0.0,"2026-05-17":0.0,"2026-05-18":0.0,"2026-05-19":0.0,"2026-05-20":0.0,"2026-05-21":0.0,"2026-05-22":0.0,"2026-05-23":0.0,"2026-05-24":0.0,"2026-05-25":0.0,"2026-05-26":0.0,"2026-05-27":0.0,"2026-05-28":0.0,"2026-05-29":0.0,"2026-05-30":0.0,"2026-05-31":0.0,"2026-06-01":0.0,"2026-06-02":0.0,"2026-06-03":0.0,"2026-06-04":0.0,"2026-06-05":0.0,"2026-06-06":0.0,"2026-06-07":0.0,"2026-06-08":0.0,"2026-06-09":0.0,"2026-06-10":0.0,"2026-06-11":0.0,"2026-06-12":0.0,"2026-06-13":0.0,"2026-06-14":0.0,"2026-06-15":0.0,"2026-06-16":0.0,"2026-06-17":0.0}},"B0GF2LWFRB|US":{"brand":"JIGOO","model":"J300灰色","asin":"B0GF2LWFRB","site":"US","sales":{"2026-05-01":0.0,"2026-05-02":0.0,"2026-05-03":0.0,"2026-05-04":0.0,"2026-05-05":0.0,"2026-05-06":0.0,"2026-05-07":0.0,"2026-05-08":0.0,"2026-05-09":0.0,"2026-05-10":0.0,"2026-05-11":0.0,"2026-05-12":0.0,"2026-05-13":0.0,"2026-05-14":0.0,"2026-05-15":0.0,"2026-05-16":0.0,"2026-05-17":0.0,"2026-05-18":0.0,"2026-05-19":0.0,"2026-05-20":0.0,"2026-05-21":0.0,"2026-05-22":0.0,"2026-05-23":0.0,"2026-05-24":0.0,"2026-05-25":0.0,"2026-05-26":0.0,"2026-05-27":0.0,"2026-05-28":0.0,"2026-05-29":0.0,"2026-05-30":0.0,"2026-05-31":0.0,"2026-06-01":0.0,"2026-06-02":0.0,"2026-06-03":0.0,"2026-06-04":0.0,"2026-06-05":0.0,"2026-06-06":0.0,"2026-06-07":0.0,"2026-06-08":0.0,"2026-06-09":0.0,"2026-06-10":1.0,"2026-06-11":0.0,"2026-06-12":1.0,"2026-06-13":1.0,"2026-06-14":0.0,"2026-06-15":0.0,"2026-06-16":0.0,"2026-06-17":1.0},"gv":{"2026-05-01":0.0,"2026-05-02":0.0,"2026-05-03":0.0,"2026-05-04":0.0,"2026-05-05":0.0,"2026-05-06":0.0,"2026-05-07":0.0,"2026-05-08":0.0,"2026-05-09":0.0,"2026-05-10":0.0,"2026-05-11":0.0,"2026-05-12":0.0,"2026-05-13":0.0,"2026-05-14":0.0,"2026-05-15":0.0,"2026-05-16":0.0,"2026-05-17":0.0,"2026-05-18":0.0,"2026-05-19":0.0,"2026-05-20":0.0,"2026-05-21":0.0,"2026-05-22":0.0,"2026-05-23":0.0,"2026-05-24":0.0,"2026-05-25":0.0,"2026-05-26":0.0,"2026-05-27":0.0,"2026-05-28":0.0,"2026-05-29":0.0,"2026-05-30":0.0,"2026-05-31":0.0,"2026-06-01":0.0,"2026-06-02":0.0,"2026-06-03":0.0,"2026-06-04":0.0,"2026-06-05":0.0,"2026-06-06":0.0,"2026-06-07":0.0,"2026-06-08":0.0,"2026-06-09":1.0,"2026-06-10":0.0,"2026-06-11":0.0,"2026-06-12":19.0,"2026-06-13":30.0,"2026-06-14":19.0,"2026-06-15":34.0,"2026-06-16":6.0,"2026-06-17":4.0}},"B0CS91TBNM|US":{"brand":"JIGOO","model":"J200","asin":"B0CS91TBNM","site":"US","sales":{"2026-05-01":0.0,"2026-05-02":0.0,"2026-05-03":0.0,"2026-05-04":0.0,"2026-05-05":0.0,"2026-05-06":0.0,"2026-05-07":0.0,"2026-05-08":0.0,"2026-05-09":0.0,"2026-05-10":0.0,"2026-05-11":3.0,"2026-05-12":4.0,"2026-05-13":1.0,"2026-05-14":0.0,"2026-05-15":2.0,"2026-05-16":4.0,"2026-05-17":4.0,"2026-05-18":2.0,"2026-05-19":3.0,"2026-05-20":3.0,"2026-05-21":2.0,"2026-05-22":1.0,"2026-05-23":2.0,"2026-05-24":1.0,"2026-05-25":0.0,"2026-05-26":0.0,"2026-05-27":0.0,"2026-05-28":0.0,"2026-05-29":0.0,"2026-05-30":0.0,"2026-05-31":0.0,"2026-06-01":0.0,"2026-06-02":0.0,"2026-06-03":0.0,"2026-06-04":0.0,"2026-06-05":0.0,"2026-06-06":0.0,"2026-06-07":0.0,"2026-06-08":0.0,"2026-06-09":0.0,"2026-06-10":0.0,"2026-06-11":0.0,"2026-06-12":0.0,"2026-06-13":0.0,"2026-06-14":0.0,"2026-06-15":0.0,"2026-06-16":1.0,"2026-06-17":0.0},"gv":{"2026-05-01":0.0,"2026-05-02":0.0,"2026-05-03":0.0,"2026-05-04":0.0,"2026-05-05":0.0,"2026-05-06":0.0,"2026-05-07":0.0,"2026-05-08":0.0,"2026-05-09":0.0,"2026-05-10":64.0,"2026-05-11":89.0,"2026-05-12":270.0,"2026-05-13":49.0,"2026-05-14":17.0,"2026-05-15":21.0,"2026-05-16":393.0,"2026-05-17":437.0,"2026-05-18":131.0,"2026-05-19":126.0,"2026-05-20":246.0,"2026-05-21":162.0,"2026-05-22":170.0,"2026-05-23":202.0,"2026-05-24":187.0,"2026-05-25":6.0,"2026-05-26":0.0,"2026-05-27":0.0,"2026-05-28":0.0,"2026-05-29":0.0,"2026-05-30":0.0,"2026-05-31":0.0,"2026-06-01":0.0,"2026-06-02":0.0,"2026-06-03":0.0,"2026-06-04":0.0,"2026-06-05":0.0,"2026-06-06":0.0,"2026-06-07":0.0,"2026-06-08":0.0,"2026-06-09":0.0,"2026-06-10":0.0,"2026-06-11":0.0,"2026-06-12":0.0,"2026-06-13":0.0,"2026-06-14":1.0,"2026-06-15":2.0,"2026-06-16":1.0,"2026-06-17":0.0}},"B0DKF6V2CV|US":{"brand":"JIGOO","model":"S100","asin":"B0DKF6V2CV","site":"US","sales":{"2026-05-01":0.0,"2026-05-02":0.0,"2026-05-03":0.0,"2026-05-04":0.0,"2026-05-05":0.0,"2026-05-06":0.0,"2026-05-07":0.0,"2026-05-08":0.0,"2026-05-09":0.0,"2026-05-10":0.0,"2026-05-11":0.0,"2026-05-12":0.0,"2026-05-13":0.0,"2026-05-14":0.0,"2026-05-15":0.0,"2026-05-16":1.0,"2026-05-17":2.0,"2026-05-18":4.0,"2026-05-19":0.0,"2026-05-20":1.0,"2026-05-21":2.0,"2026-05-22":1.0,"2026-05-23":2.0,"2026-05-24":5.0,"2026-05-25":2.0,"2026-05-26":2.0,"2026-05-27":5.0,"2026-05-28":2.0,"2026-05-29":4.0,"2026-05-30":0.0,"2026-05-31":3.0,"2026-06-01":0.0,"2026-06-02":1.0,"2026-06-03":0.0,"2026-06-04":0.0,"2026-06-05":0.0,"2026-06-06":0.0,"2026-06-07":1.0,"2026-06-08":1.0,"2026-06-09":0.0,"2026-06-10":1.0,"2026-06-11":1.0,"2026-06-12":0.0,"2026-06-13":0.0,"2026-06-14":1.0,"2026-06-15":2.0,"2026-06-16":2.0,"2026-06-17":1.0},"gv":{"2026-05-01":0.0,"2026-05-02":0.0,"2026-05-03":0.0,"2026-05-04":0.0,"2026-05-05":0.0,"2026-05-06":0.0,"2026-05-07":0.0,"2026-05-08":0.0,"2026-05-09":0.0,"2026-05-10":0.0,"2026-05-11":0.0,"2026-05-12":0.0,"2026-05-13":0.0,"2026-05-14":35.0,"2026-05-15":64.0,"2026-05-16":56.0,"2026-05-17":62.0,"2026-05-18":85.0,"2026-05-19":81.0,"2026-05-20":110.0,"2026-05-21":127.0,"2026-05-22":75.0,"2026-05-23":126.0,"2026-05-24":150.0,"2026-05-25":148.0,"2026-05-26":51.0,"2026-05-27":2.0,"2026-05-28":0.0,"2026-05-29":0.0,"2026-05-30":0.0,"2026-05-31":0.0,"2026-06-01":0.0,"2026-06-02":0.0,"2026-06-03":0.0,"2026-06-04":0.0,"2026-06-05":0.0,"2026-06-06":0.0,"2026-06-07":0.0,"2026-06-08":0.0,"2026-06-09":0.0,"2026-06-10":0.0,"2026-06-11":0.0,"2026-06-12":2.0,"2026-06-13":3.0,"2026-06-14":4.0,"2026-06-15":12.0,"2026-06-16":25.0,"2026-06-17":46.0}},"B0CH2ZQZLV|US":{"brand":"JIGOO","model":"T600灰色","asin":"B0CH2ZQZLV","site":"US","sales":{"2026-05-01":0.0,"2026-05-02":0.0,"2026-05-03":0.0,"2026-05-04":0.0,"2026-05-05":0.0,"2026-05-06":0.0,"2026-05-07":0.0,"2026-05-08":0.0,"2026-05-09":0.0,"2026-05-10":0.0,"2026-05-11":0.0,"2026-05-12":0.0,"2026-05-13":0.0,"2026-05-14":0.0,"2026-05-15":0.0,"2026-05-16":0.0,"2026-05-17":0.0,"2026-05-18":0.0,"2026-05-19":0.0,"2026-05-20":0.0,"2026-05-21":0.0,"2026-05-22":0.0,"2026-05-23":0.0,"2026-05-24":0.0,"2026-05-25":0.0,"2026-05-26":0.0,"2026-05-27":0.0,"2026-05-28":0.0,"2026-05-29":0.0,"2026-05-30":0.0,"2026-05-31":0.0,"2026-06-01":0.0,"2026-06-02":0.0,"2026-06-03":0.0,"2026-06-04":0.0,"2026-06-05":0.0,"2026-06-06":0.0,"2026-06-07":0.0,"2026-06-08":0.0,"2026-06-09":0.0,"2026-06-10":0.0,"2026-06-11":4.0,"2026-06-12":0.0,"2026-06-13":0.0,"2026-06-14":0.0,"2026-06-15":0.0,"2026-06-16":0.0,"2026-06-17":0.0},"gv":{"2026-05-01":0.0,"2026-05-02":0.0,"2026-05-03":0.0,"2026-05-04":0.0,"2026-05-05":0.0,"2026-05-06":0.0,"2026-05-07":0.0,"2026-05-08":0.0,"2026-05-09":0.0,"2026-05-10":0.0,"2026-05-11":0.0,"2026-05-12":0.0,"2026-05-13":0.0,"2026-05-14":0.0,"2026-05-15":0.0,"2026-05-16":0.0,"2026-05-17":0.0,"2026-05-18":0.0,"2026-05-19":0.0,"2026-05-20":0.0,"2026-05-21":0.0,"2026-05-22":0.0,"2026-05-23":0.0,"2026-05-24":0.0,"2026-05-25":0.0,"2026-05-26":0.0,"2026-05-27":0.0,"2026-05-28":0.0,"2026-05-29":0.0,"2026-05-30":0.0,"2026-05-31":0.0,"2026-06-01":0.0,"2026-06-02":0.0,"2026-06-03":0.0,"2026-06-04":0.0,"2026-06-05":0.0,"2026-06-06":0.0,"2026-06-07":0.0,"2026-06-08":0.0,"2026-06-09":0.0,"2026-06-10":0.0,"2026-06-11":0.0,"2026-06-12":0.0,"2026-06-13":0.0,"2026-06-14":0.0,"2026-06-15":0.0,"2026-06-16":0.0,"2026-06-17":0.0}},"B0CH318L1J|US":{"brand":"JIGOO","model":"T600白色","asin":"B0CH318L1J","site":"US","sales":{"2026-05-01":0.0,"2026-05-02":0.0,"2026-05-03":0.0,"2026-05-04":0.0,"2026-05-05":0.0,"2026-05-06":0.0,"2026-05-07":0.0,"2026-05-08":0.0,"2026-05-09":0.0,"2026-05-10":0.0,"2026-05-11":0.0,"2026-05-12":0.0,"2026-05-13":0.0,"2026-05-14":0.0,"2026-05-15":0.0,"2026-05-16":0.0,"2026-05-17":0.0,"2026-05-18":0.0,"2026-05-19":0.0,"2026-05-20":0.0,"2026-05-21":0.0,"2026-05-22":0.0,"2026-05-23":0.0,"2026-05-24":0.0,"2026-05-25":0.0,"2026-05-26":0.0,"2026-05-27":0.0,"2026-05-28":0.0,"2026-05-29":0.0,"2026-05-30":0.0,"2026-05-31":0.0,"2026-06-01":0.0,"2026-06-02":0.0,"2026-06-03":0.0,"2026-06-04":0.0,"2026-06-05":0.0,"2026-06-06":0.0,"2026-06-07":0.0,"2026-06-08":0.0,"2026-06-09":0.0,"2026-06-10":0.0,"2026-06-11":0.0,"2026-06-12":0.0,"2026-06-13":0.0,"2026-06-14":0.0,"2026-06-15":0.0,"2026-06-16":0.0,"2026-06-17":0.0},"gv":{"2026-05-01":0.0,"2026-05-02":0.0,"2026-05-03":0.0,"2026-05-04":0.0,"2026-05-05":0.0,"2026-05-06":0.0,"2026-05-07":0.0,"2026-05-08":0.0,"2026-05-09":0.0,"2026-05-10":0.0,"2026-05-11":0.0,"2026-05-12":0.0,"2026-05-13":0.0,"2026-05-14":0.0,"2026-05-15":0.0,"2026-05-16":0.0,"2026-05-17":0.0,"2026-05-18":0.0,"2026-05-19":0.0,"2026-05-20":0.0,"2026-05-21":0.0,"2026-05-22":0.0,"2026-05-23":0.0,"2026-05-24":0.0,"2026-05-25":0.0,"2026-05-26":0.0,"2026-05-27":0.0,"2026-05-28":0.0,"2026-05-29":0.0,"2026-05-30":0.0,"2026-05-31":0.0,"2026-06-01":0.0,"2026-06-02":0.0,"2026-06-03":0.0,"2026-06-04":0.0,"2026-06-05":0.0,"2026-06-06":0.0,"2026-06-07":0.0,"2026-06-08":0.0,"2026-06-09":0.0,"2026-06-10":0.0,"2026-06-11":0.0,"2026-06-12":0.0,"2026-06-13":0.0,"2026-06-14":0.0,"2026-06-15":0.0,"2026-06-16":0.0,"2026-06-17":0.0}},"B0CB821FTX|US":{"brand":"JIGOO","model":"S300 PRO","asin":"B0CB821FTX","site":"US","sales":{"2026-05-01":0.0,"2026-05-02":0.0,"2026-05-03":0.0,"2026-05-04":0.0,"2026-05-05":0.0,"2026-05-06":0.0,"2026-05-07":0.0,"2026-05-08":0.0,"2026-05-09":0.0,"2026-05-10":0.0,"2026-05-11":0.0,"2026-05-12":0.0,"2026-05-13":0.0,"2026-05-14":0.0,"2026-05-15":0.0,"2026-05-16":0.0,"2026-05-17":0.0,"2026-05-18":0.0,"2026-05-19":0.0,"2026-05-20":0.0,"2026-05-21":0.0,"2026-05-22":0.0,"2026-05-23":0.0,"2026-05-24":0.0,"2026-05-25":0.0,"2026-05-26":0.0,"2026-05-27":0.0,"2026-05-28":0.0,"2026-05-29":0.0,"2026-05-30":0.0,"2026-05-31":0.0,"2026-06-01":0.0,"2026-06-02":0.0,"2026-06-03":0.0,"2026-06-04":0.0,"2026-06-05":0.0,"2026-06-06":0.0,"2026-06-07":0.0,"2026-06-08":0.0,"2026-06-09":0.0,"2026-06-10":0.0,"2026-06-11":0.0,"2026-06-12":0.0,"2026-06-13":0.0,"2026-06-14":0.0,"2026-06-15":0.0,"2026-06-16":0.0,"2026-06-17":0.0},"gv":{"2026-05-01":0.0,"2026-05-02":0.0,"2026-05-03":0.0,"2026-05-04":0.0,"2026-05-05":0.0,"2026-05-06":0.0,"2026-05-07":0.0,"2026-05-08":0.0,"2026-05-09":0.0,"2026-05-10":0.0,"2026-05-11":0.0,"2026-05-12":0.0,"2026-05-13":0.0,"2026-05-14":0.0,"2026-05-15":0.0,"2026-05-16":0.0,"2026-05-17":0.0,"2026-05-18":0.0,"2026-05-19":0.0,"2026-05-20":0.0,"2026-05-21":0.0,"2026-05-22":0.0,"2026-05-23":0.0,"2026-05-24":0.0,"2026-05-25":0.0,"2026-05-26":0.0,"2026-05-27":0.0,"2026-05-28":0.0,"2026-05-29":0.0,"2026-05-30":0.0,"2026-05-31":0.0,"2026-06-01":0.0,"2026-06-02":0.0,"2026-06-03":0.0,"2026-06-04":0.0,"2026-06-05":0.0,"2026-06-06":0.0,"2026-06-07":0.0,"2026-06-08":0.0,"2026-06-09":0.0,"2026-06-10":0.0,"2026-06-11":0.0,"2026-06-12":0.0,"2026-06-13":0.0,"2026-06-14":0.0,"2026-06-15":0.0,"2026-06-16":0.0,"2026-06-17":0.0}}};
+const LS_KEY = 'vc_monitor_data_v2';
+
+// ==================== STATE ====================
+let appData = {};
+let state = {
+  brands: new Set(),
+  sites: new Set(),
+  asins: new Set(),
+  dateStart: '',
+  dateEnd: ''
+};
+let charts = {};
+let compareCharts = {};
+
+// ==================== LOAD/SAVE ====================
+function loadData() {
+  const stored = localStorage.getItem(LS_KEY);
+  appData = JSON.parse(JSON.stringify(INIT_DATA));
+  if (stored) {
+    const storedData = JSON.parse(stored);
+    for (const key of Object.keys(storedData)) {
+      if (!appData[key]) appData[key] = storedData[key];
+      else {
+        appData[key].sales = { ...appData[key].sales, ...(storedData[key].sales||{}) };
+        appData[key].gv = { ...appData[key].gv, ...(storedData[key].gv||{}) };
+      }
+    }
+  }
+}
+
+function saveLocalData(newData) {
+  const existing = JSON.parse(localStorage.getItem(LS_KEY) || '{}');
+  for (const key of Object.keys(newData)) {
+    if (!existing[key]) existing[key] = newData[key];
+    else {
+      existing[key].sales = { ...(existing[key].sales||{}), ...(newData[key].sales||{}) };
+      existing[key].gv = { ...(existing[key].gv||{}), ...(newData[key].gv||{}) };
+    }
+  }
+  localStorage.setItem(LS_KEY, JSON.stringify(existing));
+}
+
+// ==================== UTILS ====================
+function fmtDate(dt) {
+  // Excel serial or JS Date to YYYY-MM-DD
+  if (!dt) return null;
+  if (typeof dt === 'number') {
+    const d = new Date(Math.round((dt - 25569) * 86400 * 1000));
+    return d.toISOString().slice(0,10);
+  }
+  if (dt instanceof Date) {
+    return dt.toISOString().slice(0,10);
+  }
+  if (typeof dt === 'string' && dt.match(/^\d{4}-\d{2}-\d{2}/)) return dt.slice(0,10);
+  return null;
+}
+
+function numFmt(n, dec=0) {
+  if (n==null||isNaN(n)) return '—';
+  return Number(n).toLocaleString('zh-CN',{minimumFractionDigits:dec,maximumFractionDigits:dec});
+}
+
+function pctFmt(n) {
+  if (n==null||isNaN(n)) return '—';
+  return (n*100).toFixed(1) + '%';
+}
+
+function changeFmt(chg, isAbs=false) {
+  if (chg==null||isNaN(chg)||!isFinite(chg)) return '<span class="change-neu">—</span>';
+  const sign = chg >= 0 ? '+' : '';
+  const cls = chg > 0 ? 'change-up' : chg < 0 ? 'change-down' : 'change-neu';
+  const str = isAbs ? sign + (chg*100).toFixed(1)+'pp' : sign + (chg*100).toFixed(1)+'%';
+  return `<span class="${cls}">${str}</span>`;
+}
+
+function getAllDates() {
+  const s = new Set();
+  for (const v of Object.values(appData)) {
+    Object.keys(v.sales||{}).forEach(d=>s.add(d));
+    Object.keys(v.gv||{}).forEach(d=>s.add(d));
+  }
+  return [...s].sort();
+}
+
+function getFilteredEntries() {
+  return Object.entries(appData).filter(([key, v]) => {
+    if (!isValidSite(v.site)) return false;           // exclude junk site values
+    if (state.brands.size && !state.brands.has(v.brand)) return false;
+    if (state.sites.size && !state.sites.has(v.site)) return false;
+    if (state.asins.size && !state.asins.has(v.model)) return false; // filter by model name
+    return true;
+  });
+}
+
+function getDateRange(entries) {
+  const allDates = getAllDates();
+  let dates = allDates;
+  if (state.dateStart) dates = dates.filter(d => d >= state.dateStart);
+  if (state.dateEnd) dates = dates.filter(d => d <= state.dateEnd);
+  // Only dates that exist in at least one entry
+  const entryDates = new Set();
+  for (const [,v] of entries) {
+    Object.keys(v.sales||{}).forEach(d=>entryDates.add(d));
+    Object.keys(v.gv||{}).forEach(d=>entryDates.add(d));
+  }
+  return dates.filter(d => entryDates.has(d));
+}
+
+function getMetricsForDates(entries, dates) {
+  // Aggregate sales/gv/cr per date across all entries
+  const result = {};
+  for (const d of dates) {
+    let sales=0, gv=0;
+    for (const [,v] of entries) {
+      sales += (v.sales||{})[d] || 0;
+      gv += (v.gv||{})[d] || 0;
+    }
+    result[d] = { sales, gv, cr: gv>0 ? sales/gv : 0 };
+  }
+  return result;
+}
+
+// ==================== FILTER UI ====================
+// pending state: what user has selected but not yet confirmed
+const pending = { brands: new Set(), sites: new Set(), asins: new Set() };
+
+// Sites that must never appear in filters regardless of data source
+const INVALID_SITES = new Set(['Sales-Manufacturing-Ordered Units','Sales-Manufacturing-Shipped Units','Ordered Units','Shipped Units']);
+function isValidSite(s) { return !!s && !INVALID_SITES.has(s) && s.length <= 8; }
+
+function buildFilterUI() {
+  const allBrands = [...new Set(Object.values(appData).map(v=>v.brand).filter(Boolean))].sort();
+  const allSites  = [...new Set(Object.values(appData).map(v=>v.site).filter(isValidSite))].sort();
+  buildCheckList('brandList', allBrands, pending.brands, () => {
+    updateTriggerText('brand', allBrands.length);
+    // rebuild model list whenever brand selection changes
+    buildModelList(document.getElementById('modelSearch').value);
+    markDirty();
+  });
+  buildCheckList('siteList', allSites, pending.sites, () => {
+    updateTriggerText('site', allSites.length);
+    markDirty();
+  });
+  buildModelList('');
+}
+
+function buildCheckList(containerId, items, selectedSet, onChange) {
+  const list = document.getElementById(containerId);
+  list.innerHTML = '';
+  // "全部" row
+  const allRow = makeCheckItem('全部', selectedSet.size===0, true, () => {
+    selectedSet.clear();
+    buildCheckList(containerId, items, selectedSet, onChange);
+    onChange();
+  });
+  list.appendChild(allRow);
+  const div = document.createElement('div');
+  div.className = 'multi-divider';
+  list.appendChild(div);
+  // individual items
+  items.forEach(item => {
+    const row = makeCheckItem(item, selectedSet.has(item), false, () => {
+      if (selectedSet.has(item)) selectedSet.delete(item);
+      else selectedSet.add(item);
+      buildCheckList(containerId, items, selectedSet, onChange);
+      onChange();
+    });
+    list.appendChild(row);
+  });
+}
+
+function makeCheckItem(label, checked, isAll, onchange) {
+  const div = document.createElement('div');
+  div.className = 'multi-item';
+  const cb = document.createElement('input');
+  cb.type = 'checkbox';
+  cb.checked = isAll ? (checked) : checked;
+  if (isAll) cb.style.accentColor = '#6b7280';
+  cb.onchange = onchange;
+  const lbl = document.createElement('span');
+  lbl.className = 'multi-item-label';
+  lbl.textContent = label;
+  if (isAll) lbl.style.color = 'var(--gray)';
+  div.appendChild(cb);
+  div.appendChild(lbl);
+  return div;
+}
+
+function buildModelList(search) {
+  // Only show models belonging to currently selected brands (in pending)
+  const activeBrands = pending.brands.size > 0 ? pending.brands : null;
+  const entries = Object.values(appData).filter(v =>
+    !activeBrands || activeBrands.has(v.brand)
+  );
+  const lower = search.toLowerCase();
+  // collect models
+  const modelMap = {}; // model -> brand
+  entries.forEach(v => {
+    if (!v.model) return;
+    if (lower && !v.model.toLowerCase().includes(lower)) return;
+    if (!modelMap[v.model]) modelMap[v.model] = v.brand;
+  });
+  const models = Object.keys(modelMap).sort();
+
+  // Remove any selected models that are no longer in scope
+  for (const m of [...pending.asins]) {
+    if (!modelMap[m]) pending.asins.delete(m);
+  }
+
+  const list = document.getElementById('modelList');
+  list.innerHTML = '';
+  // all row
+  const allRow = makeCheckItem('全部型号', pending.asins.size===0, true, () => {
+    pending.asins.clear();
+    buildModelList(document.getElementById('modelSearch').value);
+    updateModelTrigger();
+    markDirty();
+  });
+  list.appendChild(allRow);
+  const divEl = document.createElement('div');
+  divEl.className = 'multi-divider';
+  list.appendChild(divEl);
+
+  models.forEach(model => {
+    const row = makeCheckItem(model, pending.asins.has(model), false, () => {
+      if (pending.asins.has(model)) pending.asins.delete(model);
+      else pending.asins.add(model);
+      buildModelList(document.getElementById('modelSearch').value);
+      updateModelTrigger();
+      markDirty();
+    });
+    // add small brand tag
+    const tag = document.createElement('span');
+    tag.style.cssText = 'font-size:10px;color:var(--gray);margin-left:4px';
+    tag.textContent = modelMap[model]||'';
+    row.appendChild(tag);
+    list.appendChild(row);
+  });
+
+  updateModelTrigger();
+  updateTriggerText('brand', [...new Set(Object.values(appData).map(v=>v.brand).filter(Boolean))].length);
+  updateTriggerText('site', [...new Set(Object.values(appData).map(v=>v.site).filter(Boolean))].length);
+}
+
+function updateModelTrigger() {
+  document.getElementById('modelTriggerText').textContent =
+    pending.asins.size === 0 ? '全部型号' : `已选 ${pending.asins.size} 个型号`;
+}
+
+function updateTriggerText(type, total) {
+  const map = { brand:['brands','brandTriggerText','全部品牌'], site:['sites','siteTriggerText','全部站点'] };
+  const [key, textId, allLabel] = map[type];
+  const sel = pending[key];
+  document.getElementById(textId).textContent = sel.size===0 ? allLabel : `已选 ${sel.size}/${total}`;
+}
+
+// Dropdown toggle (close others first)
+function toggleDd(type) {
+  const panels = { brand:'brandPanel', site:'sitePanel', model:'modelPanel' };
+  const triggers = { brand:'brandTrigger', site:'siteTrigger', model:'modelTrigger' };
+  const isOpen = document.getElementById(panels[type]).classList.contains('open');
+  // close all
+  Object.values(panels).forEach(id => document.getElementById(id).classList.remove('open'));
+  Object.values(triggers).forEach(id => document.getElementById(id).classList.remove('open'));
+  // open current if was closed
+  if (!isOpen) {
+    document.getElementById(panels[type]).classList.add('open');
+    document.getElementById(triggers[type]).classList.add('open');
+  }
+}
+
+document.addEventListener('click', e => {
+  const dds = ['brandDd','siteDd','modelDd'];
+  if (!dds.some(id => document.getElementById(id).contains(e.target))) {
+    ['brandPanel','sitePanel','modelPanel'].forEach(id => document.getElementById(id).classList.remove('open'));
+    ['brandTrigger','siteTrigger','modelTrigger'].forEach(id => document.getElementById(id).classList.remove('open'));
+  }
+});
+
+function markDirty() {
+  document.getElementById('filterHint').classList.add('show');
+}
+
+function resetFilters() {
+  pending.brands.clear();
+  pending.sites.clear();
+  pending.asins.clear();
+  document.getElementById('dateStart').value = '';
+  document.getElementById('dateEnd').value = '';
+  document.getElementById('modelSearch').value = '';
+  clearQuickActive();
+  buildFilterUI();
+  document.getElementById('filterHint').classList.remove('show');
+  applyFilters();
+}
+
+// ==================== QUICK DATE ====================
+function setQuickDate(type) {
+  const allDates = getAllDates();
+  if (!allDates.length) return;
+  const latest = allDates[allDates.length - 1];
+  const latestDt = new Date(latest + 'T00:00:00');
+  let start, end = latest;
+
+  if (type === '7') {
+    const d = new Date(latestDt); d.setDate(d.getDate() - 6);
+    start = d.toISOString().slice(0,10);
+  } else if (type === '14') {
+    const d = new Date(latestDt); d.setDate(d.getDate() - 13);
+    start = d.toISOString().slice(0,10);
+  } else if (type === '30') {
+    const d = new Date(latestDt); d.setDate(d.getDate() - 29);
+    start = d.toISOString().slice(0,10);
+  } else if (type === 'lastmonth') {
+    const y = latestDt.getFullYear(), m = latestDt.getMonth();
+    start = new Date(y, m-1, 1).toISOString().slice(0,10);
+    end   = new Date(y, m, 0).toISOString().slice(0,10);
+  }
+
+  document.getElementById('dateStart').value = start;
+  document.getElementById('dateEnd').value = end;
+  // highlight active quick button
+  document.querySelectorAll('.qd-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.q === type);
+  });
+  applyFilters();
+}
+
+function clearQuickActive() {
+  document.querySelectorAll('.qd-btn').forEach(b => b.classList.remove('active'));
+}
+
+// ==================== APPLY FILTERS & RENDER ====================
+function applyFilters() {
+  // Commit pending selections into active state
+  state.brands = new Set(pending.brands);
+  state.sites  = new Set(pending.sites);
+  state.asins  = new Set(pending.asins);
+  state.dateStart = document.getElementById('dateStart').value;
+  state.dateEnd   = document.getElementById('dateEnd').value;
+  document.getElementById('filterHint').classList.remove('show');
+  renderAll();
+}
+
+function renderAll() {
+  const entries = getFilteredEntries();
+  const dates = getDateRange(entries);
+  renderKPIs(entries, dates);
+  renderTrendChart(entries, dates);
+  renderModelChart(entries, dates);
+  renderSiteChart(entries, dates);
+  renderDetailTable(entries, dates);
+  renderAnomalyTab(entries, dates);
+  renderManageTab();
+}
+
+// ==================== KPI ====================
+function renderKPIs(entries, dates) {
+  const metrics = getMetricsForDates(entries, dates);
+  let totalSales=0, totalGV=0;
+  const activeAsins = new Set();
+  for (const d of dates) {
+    const m = metrics[d] || {};
+    totalSales += m.sales||0;
+    totalGV += m.gv||0;
+  }
+  for (const [,v] of entries) {
+    const hasSales = dates.some(d => ((v.sales||{})[d]||0) > 0);
+    if (hasSales) activeAsins.add(v.asin + '|' + v.site);
+  }
+  const avgCR = totalGV > 0 ? totalSales / totalGV : 0;
+
+  document.getElementById('kpiSales').textContent = numFmt(totalSales);
+  document.getElementById('kpiGV').textContent = numFmt(totalGV);
+  document.getElementById('kpiCR').textContent = pctFmt(avgCR);
+  document.getElementById('kpiActive').textContent = activeAsins.size;
+  document.getElementById('kpiSalesSub').textContent = `共 ${dates.length} 天 日均 ${numFmt(totalSales/Math.max(dates.length,1),1)} 件`;
+  document.getElementById('kpiGVSub').textContent = `日均 ${numFmt(totalGV/Math.max(dates.length,1),0)} GV`;
+  document.getElementById('kpiCRSub').textContent = `转化率 = 销量 / GV`;
+  document.getElementById('kpiActiveSub').textContent = `共追踪 ${entries.length} 个 ASIN×站点`;
+
+  if (dates.length > 0) {
+    document.getElementById('dataRangeInfo').textContent = `数据周期: ${dates[0]} 至 ${dates[dates.length-1]}（共 ${dates.length} 天）`;
+    document.getElementById('trendDateRange').textContent = `${dates[0]} ~ ${dates[dates.length-1]}`;
+  }
+}
+
+// ==================== CHARTS ====================
+function destroyChart(id) {
+  if (charts[id]) { charts[id].destroy(); delete charts[id]; }
+}
+
+const SITE_COLORS = {DE:'#2563eb',FR:'#16a34a',IT:'#dc2626',ES:'#ca8a04',US:'#7c3aed'};
+const BRAND_COLORS = {JIMMY:'#2563eb',JIGOO:'#7c3aed'};
+const PERIOD_COLORS = ['#2563eb','#7c3aed','#d97706'];
+
+function renderTrendChart(entries, dates) {
+  destroyChart('trend');
+  const ctx = document.getElementById('trendChart').getContext('2d');
+  const metrics = getMetricsForDates(entries, dates);
+  const salesData = dates.map(d => (metrics[d]||{}).sales||0);
+  const gvData = dates.map(d => (metrics[d]||{}).gv||0);
+  const crData = dates.map(d => {
+    const m = metrics[d]||{};
+    return m.gv > 0 ? +(m.sales/m.gv*100).toFixed(2) : 0;
+  });
+  const labels = dates.map(d => d.slice(5));
+
+  charts['trend'] = new Chart(ctx, {
+    data: {
+      labels,
+      datasets: [
+        { type:'bar', label:'销量', data:salesData, backgroundColor:'rgba(37,99,235,.7)', yAxisID:'y', order:2, borderRadius:2 },
+        { type:'line', label:'GV流量', data:gvData, borderColor:'#16a34a', backgroundColor:'rgba(22,163,74,.1)', yAxisID:'y2', tension:.3, fill:false, pointRadius:2, order:1 },
+        { type:'line', label:'CR%', data:crData, borderColor:'#d97706', backgroundColor:'transparent', yAxisID:'y3', tension:.3, pointRadius:2, borderDash:[4,2], order:0 }
+      ]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      interaction:{mode:'index',intersect:false},
+      plugins:{legend:{position:'top',labels:{font:{size:12},boxWidth:12}}},
+      scales:{
+        y:{type:'linear',position:'left',title:{display:true,text:'销量（件）',font:{size:11}},beginAtZero:true,ticks:{font:{size:10}}},
+        y2:{type:'linear',position:'right',title:{display:true,text:'GV',font:{size:11}},beginAtZero:true,grid:{drawOnChartArea:false},ticks:{font:{size:10}}},
+        y3:{type:'linear',position:'right',title:{display:true,text:'CR%',font:{size:11}},beginAtZero:true,grid:{drawOnChartArea:false},ticks:{font:{size:10},callback:v=>v+'%'},min:0,offset:true,display:true}
+      }
+    }
+  });
+}
+
+// Inline plugin: show values & % inside doughnut slices
+const pieLabelsPlugin = {
+  id:'pieLabels',
+  afterDraw(chart) {
+    const { ctx } = chart;
+    const total = chart.data.datasets[0].data.reduce((a,b)=>a+b,0);
+    chart.data.datasets.forEach((dataset,i) => {
+      const meta = chart.getDatasetMeta(i);
+      meta.data.forEach((arc, idx) => {
+        const value = dataset.data[idx];
+        const pct = value / total;
+        if (pct < 0.04 || value === 0) return;
+        const angle = (arc.startAngle + arc.endAngle) / 2;
+        const r = (arc.outerRadius + arc.innerRadius) / 2;
+        const x = arc.x + Math.cos(angle) * r;
+        const y = arc.y + Math.sin(angle) * r;
+        ctx.save();
+        ctx.fillStyle = '#fff';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.font = 'bold 11px sans-serif';
+        ctx.fillText(numFmt(value) + ' 件', x, y - 7);
+        ctx.font = '10px sans-serif';
+        ctx.fillText((pct*100).toFixed(1)+'%', x, y + 7);
+        ctx.restore();
+      });
+    });
+  }
+};
+
+function renderModelChart(entries, dates) {
+  destroyChart('model');
+  const ctx = document.getElementById('modelChart').getContext('2d');
+  const modelTotals = {};
+  for (const [,v] of entries) {
+    const model = v.model || 'Unknown';
+    if (!modelTotals[model]) modelTotals[model] = {sales:0, brand:v.brand};
+    for (const d of dates) modelTotals[model].sales += (v.sales||{})[d]||0;
+  }
+  const sorted = Object.entries(modelTotals).sort((a,b)=>b[1].sales-a[1].sales).slice(0,12);
+  const labels = sorted.map(([k])=>k);
+  const data = sorted.map(([,v])=>v.sales);
+  const colors = sorted.map(([,v])=>BRAND_COLORS[v.brand]||'#6b7280');
+  // update title badge
+  if (dates.length) document.getElementById('modelChartRange').textContent = `${dates[0].slice(5)} ~ ${dates[dates.length-1].slice(5)}`;
+
+  charts['model'] = new Chart(ctx, {
+    type:'bar',
+    data:{ labels, datasets:[{ label:'销量', data, backgroundColor:colors.map(c=>c+'bb'), borderColor:colors, borderWidth:1, borderRadius:4 }] },
+    options:{
+      responsive:true,maintainAspectRatio:false,indexAxis:'y',
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${numFmt(c.raw)} 件`}}},
+      scales:{x:{beginAtZero:true,ticks:{font:{size:10}}},y:{ticks:{font:{size:11}}}}
+    }
+  });
+}
+
+function renderSiteChart(entries, dates) {
+  destroyChart('site');
+  const ctx = document.getElementById('siteChart').getContext('2d');
+  const siteTotals = {};
+  for (const [,v] of entries) {
+    const site = v.site||'?';
+    if (!siteTotals[site]) siteTotals[site] = 0;
+    for (const d of dates) siteTotals[site] += (v.sales||{})[d]||0;
+  }
+  const labels = Object.keys(siteTotals);
+  const data = labels.map(s=>siteTotals[s]);
+  const colors = labels.map(s=>SITE_COLORS[s]||'#6b7280');
+  if (dates.length) document.getElementById('siteChartRange').textContent = `${dates[0].slice(5)} ~ ${dates[dates.length-1].slice(5)}`;
+
+  charts['site'] = new Chart(ctx, {
+    type:'doughnut',
+    data:{ labels, datasets:[{ data, backgroundColor:colors.map(c=>c+'cc'), borderColor:colors, borderWidth:2 }] },
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{
+        legend:{position:'right',labels:{font:{size:12},boxWidth:12}},
+        tooltip:{callbacks:{label:c=>`${c.label}: ${numFmt(c.raw)} 件 (${(c.parsed/data.reduce((a,b)=>a+b,0)*100).toFixed(1)}%)`}}
+      }
+    },
+    plugins:[pieLabelsPlugin]
+  });
+}
+
+// ==================== DETAIL TABLE ====================
+function renderDetailTable(entries, dates) {
+  const body = document.getElementById('detailBody');
+  const rows = [];
+  const allDates = getAllDates();
+  const latestDate = allDates.filter(d => !state.dateEnd || d <= state.dateEnd).slice(-1)[0];
+
+  for (const [, v] of entries) {
+    let sales=0, gv=0, days=0;
+    for (const d of dates) {
+      const s=(v.sales||{})[d]||0, g=(v.gv||{})[d]||0;
+      sales+=s; gv+=g; if(s>0||g>0) days++;
+    }
+    const cr = gv>0?sales/gv:null;
+    const latestS = latestDate ? ((v.sales||{})[latestDate]||0) : null;
+    const latestGV = latestDate ? ((v.gv||{})[latestDate]||0) : null;
+    const latestCR = latestGV>0 ? latestS/latestGV : null;
+    rows.push({ v, sales, gv, cr, days, latestS, latestGV, latestCR });
+  }
+  rows.sort((a,b)=>b.sales-a.sales);
+
+  body.innerHTML = rows.map(r => {
+    const siteTag = `<span class="site-tag tag-${r.v.site||''}">${r.v.site||'?'}</span>`;
+    const latestInfo = r.latestDate !== null ? 
+      `<span title="${latestDate}">销量:${numFmt(r.latestS)} GV:${numFmt(r.latestGV)} CR:${pctFmt(r.latestCR)}</span>` : '—';
+    return `<tr>
+      <td><span style="font-weight:600;color:${BRAND_COLORS[r.v.brand]||'#374151'}">${r.v.brand||'—'}</span></td>
+      <td>${r.v.model||'—'}</td>
+      <td style="font-size:11px;color:var(--gray)">${r.v.asin||'—'}</td>
+      <td>${siteTag}</td>
+      <td class="num"><b>${numFmt(r.sales)}</b></td>
+      <td class="num">${numFmt(r.gv)}</td>
+      <td class="num">${pctFmt(r.cr)}</td>
+      <td class="num">${numFmt(r.sales/Math.max(dates.length,1),1)}</td>
+      <td class="num">${numFmt(r.gv/Math.max(dates.length,1),0)}</td>
+      <td style="font-size:11px;color:var(--gray)">${latestInfo}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ==================== ANOMALY TAB ====================
+let _anomalyAll = [];       // full list
+let _anomalyFilter = null;  // active flag filter
+let _anomalyEntries = [];   // filtered entries for detail lookup
+let _anomalyAllDates = [];  // all dates for 7-day lookback
+let _detailCharts = {};
+
+function renderAnomalyTab(entries, dates) {
+  _anomalyEntries = entries;
+  _anomalyAllDates = getAllDates();
+
+  if (dates.length < 2) {
+    document.getElementById('anomalyBody').innerHTML = '<tr><td colspan="14" class="empty">数据不足，至少需要2天数据</td></tr>';
+    return;
+  }
+
+  const latestDate = dates[dates.length-1];
+  const prevDate = dates[dates.length-2];
+  document.getElementById('anomalyDateInfo').textContent =
+    `当日: ${latestDate}  vs  前日: ${prevDate}`;
+
+  const anomalies = [];
+  let salesUp=0, salesDown=0, gvDown=0, crDown=0;
+
+  for (const [,v] of entries) {
+    const s1=(v.sales||{})[prevDate]||0, s2=(v.sales||{})[latestDate]||0;
+    const g1=(v.gv||{})[prevDate]||0,   g2=(v.gv||{})[latestDate]||0;
+    const cr1=g1>0?s1/g1:null, cr2=g2>0?s2/g2:null;
+    const salesChg = s1>0?(s2-s1)/s1:null;
+    const gvChg   = g1>0?(g2-g1)/g1:null;
+    const crChg   = (cr1!=null&&cr2!=null)?cr2-cr1:null;
+
+    const flags=[];
+    if (salesChg!==null&&salesChg<-0.5){flags.push('销量骤降');salesDown++;}
+    if (salesChg!==null&&salesChg>1)   {flags.push('销量激增');salesUp++;}
+    if (gvChg!==null&&gvChg<-0.5)     {flags.push('流量骤降');gvDown++;}
+    if (crChg!==null&&crChg<-0.05)    {flags.push('CR下滑');crDown++;}
+    if (g2===0&&g1>0)                  {flags.push('无流量');if(!flags.includes('流量骤降'))gvDown++;}
+    if (s2===0&&s1>0&&g2>0)            {flags.push('有流量无出单');}
+    anomalies.push({v,s1,s2,g1,g2,cr1,cr2,salesChg,gvChg,crChg,flags,latestDate,prevDate});
+  }
+  anomalies.sort((a,b)=>b.flags.length-a.flags.length||(b.s1+b.s2)-(a.s1+a.s2));
+  _anomalyAll = anomalies;
+
+  // Summary cards (clickable)
+  const cards = [
+    {val:salesDown, lbl:'销量骤降 ASIN', cls:'anom-red',   flag:'销量骤降'},
+    {val:salesUp,   lbl:'销量激增 ASIN', cls:'anom-green', flag:'销量激增'},
+    {val:gvDown,    lbl:'流量异常 ASIN', cls:'anom-orange', flag:'流量骤降'},
+    {val:crDown,    lbl:'CR下滑 ASIN',  cls:'anom-red',   flag:'CR下滑'},
+  ];
+  document.getElementById('anomalySummary').innerHTML = cards.map(c=>`
+    <div class="anomaly-stat ${c.cls}" onclick="toggleAnomalyFilter('${c.flag}')" data-flag="${c.flag}">
+      <div class="anomaly-stat-val">${c.val}</div>
+      <div class="anomaly-stat-lbl">${c.lbl}</div>
+      <div style="font-size:10px;color:var(--gray);margin-top:4px">点击筛选</div>
+    </div>
+  `).join('');
+
+  renderAnomalyTable();
+}
+
+function toggleAnomalyFilter(flag) {
+  _anomalyFilter = _anomalyFilter === flag ? null : flag;
+  closeAnomalyDetail();
+  // Update card selected state
+  document.querySelectorAll('#anomalySummary .anomaly-stat').forEach(el => {
+    el.classList.toggle('selected', el.dataset.flag === _anomalyFilter);
+  });
+  // Update filter label
+  const hasFilter = !!_anomalyFilter;
+  document.getElementById('anomalyFilterLabel').style.display = hasFilter?'':'none';
+  document.getElementById('anomalyFilterTag').style.display = hasFilter?'':'none';
+  document.getElementById('anomalyClearFilter').style.display = hasFilter?'':'none';
+  if (hasFilter) document.getElementById('anomalyFilterTag').textContent = _anomalyFilter;
+  renderAnomalyTable();
+}
+
+function clearAnomalyFilter() { toggleAnomalyFilter(_anomalyFilter); }
+
+function renderAnomalyTable() {
+  const list = _anomalyFilter
+    ? _anomalyAll.filter(a => a.flags.includes(_anomalyFilter))
+    : _anomalyAll;
+
+  document.getElementById('anomalyBody').innerHTML = list.map((a,idx) => {
+    const flagBadges = a.flags.map(f => {
+      const cls = f.includes('骤降')||f.includes('无流量')||f.includes('下滑')||f.includes('无出单')?'badge-red':'badge-green';
+      return `<span class="badge ${cls}" style="margin-right:3px">${f}</span>`;
+    }).join('');
+    const siteTag = `<span class="site-tag tag-${a.v.site||''}">${a.v.site||'?'}</span>`;
+    const hasAnomaly = a.flags.length > 0;
+    return `<tr style="cursor:${hasAnomaly?'pointer':'default'}" ${hasAnomaly?`onclick="showAnomalyDetail('${a.v.asin}','${a.v.site}','${a.latestDate}')"`:''}
+      title="${hasAnomaly?'点击查看近7天对比分析':''}">
+      <td>${a.v.brand||'—'}</td>
+      <td>${a.v.model||'—'}</td>
+      <td style="font-size:11px;color:var(--gray)">${a.v.asin||'—'}</td>
+      <td>${siteTag}</td>
+      <td class="num">${numFmt(a.s1)}</td><td class="num">${numFmt(a.s2)}</td><td class="num">${changeFmt(a.salesChg)}</td>
+      <td class="num">${numFmt(a.g1)}</td><td class="num">${numFmt(a.g2)}</td><td class="num">${changeFmt(a.gvChg)}</td>
+      <td class="num">${pctFmt(a.cr1)}</td><td class="num">${pctFmt(a.cr2)}</td><td class="num">${changeFmt(a.crChg,true)}</td>
+      <td>${flagBadges||'<span class="badge badge-gray">正常</span>'}</td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="14" style="text-align:center;padding:20px;color:var(--gray)">该类型无异常数据</td></tr>';
+}
+
+function showAnomalyDetail(asin, site, latestDate) {
+  // Find entry
+  const entry = Object.values(appData).find(v => v.asin===asin && v.site===site);
+  if (!entry) return;
+
+  const allDates = _anomalyAllDates;
+  const latestIdx = allDates.indexOf(latestDate);
+  if (latestIdx < 0) return;
+
+  // recent 7 days (days ending at latestDate)
+  const recent7 = allDates.slice(Math.max(0, latestIdx-6), latestIdx+1);
+  // prev 7 days (7 days before recent7)
+  const prev7   = allDates.slice(Math.max(0, latestIdx-13), Math.max(0,latestIdx-6));
+
+  const recentSales = recent7.map(d=>(entry.sales||{})[d]||0);
+  const prevSales   = prev7.map(d=>(entry.sales||{})[d]||0);
+  const recentGV    = recent7.map(d=>(entry.gv||{})[d]||0);
+  const prevGV      = prev7.map(d=>(entry.gv||{})[d]||0);
+  const recentCR    = recent7.map((d,i)=>recentGV[i]>0?(recentSales[i]/recentGV[i]*100):0);
+  const prevCR      = prev7.map((d,i)=>prevGV[i]>0?(prevSales[i]/prevGV[i]*100):0);
+
+  // totals for stats
+  const rS=recentSales.reduce((a,b)=>a+b,0), pS=prevSales.reduce((a,b)=>a+b,0);
+  const rG=recentGV.reduce((a,b)=>a+b,0),   pG=prevGV.reduce((a,b)=>a+b,0);
+  const rCR=rG>0?rS/rG:0, pCR=pG>0?pS/pG:0;
+
+  document.getElementById('anomalyDetailTitle').textContent =
+    `${entry.model} (${site}) — 近7天 vs 前7天分析`;
+  document.getElementById('detailStats').innerHTML = `
+    <div style="background:#fff;padding:10px 14px;border-radius:8px;box-shadow:var(--shadow)">
+      <div style="font-size:10px;color:var(--gray)">近7天总销量</div>
+      <div style="font-size:18px;font-weight:700">${numFmt(rS)}</div>
+      <div style="font-size:11px">${changeFmt(pS>0?(rS-pS)/pS:null)} vs前7天</div>
+    </div>
+    <div style="background:#fff;padding:10px 14px;border-radius:8px;box-shadow:var(--shadow)">
+      <div style="font-size:10px;color:var(--gray)">近7天总GV</div>
+      <div style="font-size:18px;font-weight:700">${numFmt(rG)}</div>
+      <div style="font-size:11px">${changeFmt(pG>0?(rG-pG)/pG:null)} vs前7天</div>
+    </div>
+    <div style="background:#fff;padding:10px 14px;border-radius:8px;box-shadow:var(--shadow)">
+      <div style="font-size:10px;color:var(--gray)">近7天转化率</div>
+      <div style="font-size:18px;font-weight:700">${pctFmt(rCR)}</div>
+      <div style="font-size:11px">${changeFmt(pCR>0?(rCR-pCR):null,true)} vs前7天</div>
+    </div>
+    <div style="background:#fff;padding:10px 14px;border-radius:8px;box-shadow:var(--shadow)">
+      <div style="font-size:10px;color:var(--gray)">日期范围</div>
+      <div style="font-size:12px;font-weight:600;margin-top:4px">近7天: ${recent7[0]?.slice(5)||'—'} ~ ${recent7.slice(-1)[0]?.slice(5)||'—'}</div>
+      <div style="font-size:12px;color:var(--gray)">前7天: ${prev7[0]?.slice(5)||'—'} ~ ${prev7.slice(-1)[0]?.slice(5)||'—'}</div>
+    </div>
+  `;
+
+  // Destroy old detail charts
+  ['detailSales','detailGV'].forEach(k=>{ if(_detailCharts[k]){_detailCharts[k].destroy();} });
+
+  const dayLabels = Array.from({length:7},(_,i)=>`D${i+1}`);
+
+  _detailCharts['detailSales'] = new Chart(
+    document.getElementById('detailSalesChart').getContext('2d'), {
+    type:'line',
+    data:{
+      labels: dayLabels,
+      datasets:[
+        {label:`近7天 (${recent7[0]?.slice(5)||''}~)`, data:recentSales, borderColor:'#2563eb', backgroundColor:'rgba(37,99,235,.1)', fill:true, tension:.3, pointRadius:3},
+        {label:`前7天 (${prev7[0]?.slice(5)||''}~)`,   data:prevSales,  borderColor:'#d97706', backgroundColor:'rgba(217,119,6,.08)', fill:true, tension:.3, borderDash:[4,2], pointRadius:3}
+      ]
+    },
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{position:'top',labels:{font:{size:10},boxWidth:8}}},
+      scales:{y:{beginAtZero:true,ticks:{font:{size:9}}},x:{ticks:{font:{size:9}}}}}
+  });
+
+  _detailCharts['detailGV'] = new Chart(
+    document.getElementById('detailGVChart').getContext('2d'), {
+    type:'bar',
+    data:{
+      labels: dayLabels,
+      datasets:[
+        {label:'近7天 GV', data:recentGV, backgroundColor:'rgba(37,99,235,.6)', yAxisID:'y', borderRadius:3},
+        {label:'前7天 GV', data:prevGV,   backgroundColor:'rgba(217,119,6,.5)',  yAxisID:'y', borderRadius:3},
+        {type:'line',label:'近7天 CR%', data:recentCR, borderColor:'#16a34a', yAxisID:'y2', tension:.3, pointRadius:3, borderWidth:2},
+        {type:'line',label:'前7天 CR%', data:prevCR,   borderColor:'#dc2626', yAxisID:'y2', tension:.3, pointRadius:3, borderWidth:2, borderDash:[4,2]}
+      ]
+    },
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{position:'top',labels:{font:{size:10},boxWidth:8}}},
+      scales:{
+        y:{beginAtZero:true,ticks:{font:{size:9}}},
+        y2:{position:'right',beginAtZero:true,ticks:{callback:v=>v.toFixed(1)+'%',font:{size:9}},grid:{drawOnChartArea:false}},
+        x:{ticks:{font:{size:9}}}
+      }}
+  });
+
+  document.getElementById('anomalyDetail').classList.add('show');
+  document.getElementById('anomalyDetail').scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+function closeAnomalyDetail() {
+  document.getElementById('anomalyDetail').classList.remove('show');
+  ['detailSales','detailGV'].forEach(k=>{ if(_detailCharts[k]){_detailCharts[k].destroy(); delete _detailCharts[k];} });
+}
+
+// ==================== PERIOD COMPARE ====================
+function getDefaultPeriods() { setComparePeriod('thirds'); }
+
+function setComparePeriod(type) {
+  const allDates = getAllDates();
+  if (!allDates.length) return;
+  const latest = allDates[allDates.length-1];
+  const latestDt = new Date(latest+'T00:00:00');
+
+  function daysBack(dt, n) {
+    const d=new Date(dt); d.setDate(d.getDate()-n); return d.toISOString().slice(0,10);
+  }
+
+  if (type==='7v7') {
+    document.getElementById('p1Start').value = daysBack(latestDt,13);
+    document.getElementById('p1End').value   = daysBack(latestDt,7);
+    document.getElementById('p2Start').value = daysBack(latestDt,6);
+    document.getElementById('p2End').value   = latest;
+    document.getElementById('p3Start').value = daysBack(latestDt,20);
+    document.getElementById('p3End').value   = daysBack(latestDt,14);
+  } else if (type==='14v14') {
+    document.getElementById('p1Start').value = daysBack(latestDt,27);
+    document.getElementById('p1End').value   = daysBack(latestDt,14);
+    document.getElementById('p2Start').value = daysBack(latestDt,13);
+    document.getElementById('p2End').value   = latest;
+    document.getElementById('p3Start').value = daysBack(latestDt,41);
+    document.getElementById('p3End').value   = daysBack(latestDt,28);
+  } else if (type==='mvm') {
+    const y=latestDt.getFullYear(), m=latestDt.getMonth();
+    // this month so far
+    document.getElementById('p1Start').value = new Date(y,m,1).toISOString().slice(0,10);
+    document.getElementById('p1End').value   = latest;
+    // last month
+    document.getElementById('p2Start').value = new Date(y,m-1,1).toISOString().slice(0,10);
+    document.getElementById('p2End').value   = new Date(y,m,0).toISOString().slice(0,10);
+    // month before last
+    document.getElementById('p3Start').value = new Date(y,m-2,1).toISOString().slice(0,10);
+    document.getElementById('p3End').value   = new Date(y,m-1,0).toISOString().slice(0,10);
+  } else { // thirds
+    const n=allDates.length, third=Math.max(1,Math.floor(n/3));
+    document.getElementById('p1Start').value = allDates[0];
+    document.getElementById('p1End').value   = allDates[third-1];
+    document.getElementById('p2Start').value = allDates[third];
+    document.getElementById('p2End').value   = allDates[Math.min(third*2-1,n-1)];
+    document.getElementById('p3Start').value = allDates[Math.min(third*2,n-1)];
+    document.getElementById('p3End').value   = allDates[n-1];
+  }
+}
+
+function getDatesInRange(start, end) {
+  const allDates = getAllDates();
+  return allDates.filter(d => (!start||d>=start) && (!end||d<=end));
+}
+
+function runComparison() {
+  const periods = [
+    { start: document.getElementById('p1Start').value, end: document.getElementById('p1End').value, label:'周期 A', color:PERIOD_COLORS[0] },
+    { start: document.getElementById('p2Start').value, end: document.getElementById('p2End').value, label:'周期 B', color:PERIOD_COLORS[1] },
+    { start: document.getElementById('p3Start').value, end: document.getElementById('p3End').value, label:'周期 C', color:PERIOD_COLORS[2] }
+  ];
+
+  const entries = getFilteredEntries();
+  const pResults = periods.map(p => {
+    const dates = getDatesInRange(p.start, p.end);
+    const metrics = getMetricsForDates(entries, dates);
+    let totalSales=0, totalGV=0;
+    for (const d of dates) { totalSales+=(metrics[d]||{}).sales||0; totalGV+=(metrics[d]||{}).gv||0; }
+    const avgCR = totalGV>0 ? totalSales/totalGV : 0;
+    const days = dates.length;
+    // Per ASIN totals
+    const asinData = {};
+    for (const [key,v] of entries) {
+      let s=0, g=0;
+      for (const d of dates) { s+=(v.sales||{})[d]||0; g+=(v.gv||{})[d]||0; }
+      asinData[key] = { sales:s, gv:g, cr:g>0?s/g:0, days };
+    }
+    return { ...p, dates, totalSales, totalGV, avgCR, days, asinData };
+  });
+
+  document.getElementById('compareResults').style.display = 'block';
+
+  // Summary cards
+  const pA = pResults[0];
+  document.getElementById('compareSummary').innerHTML = pResults.map((p,i) => {
+    const chg = i>0&&pA.totalSales>0 ? (p.totalSales-pA.totalSales)/pA.totalSales : null;
+    return `<div class="anomaly-stat" style="border-left:3px solid ${p.color};cursor:default">
+      <div style="font-size:11px;font-weight:700;color:${p.color};margin-bottom:4px">${p.label}（${p.start?.slice(5)||'?'} ~ ${p.end?.slice(5)||'?'}，${p.days}天）</div>
+      <div class="anomaly-stat-val" style="color:${p.color};font-size:18px">${numFmt(p.totalSales)} 件</div>
+      <div class="anomaly-stat-lbl">日均 ${numFmt(p.totalSales/Math.max(p.days,1),1)} 件 | GV ${numFmt(p.totalGV/Math.max(p.days,1),0)}/天 | CR ${pctFmt(p.avgCR)}</div>
+      ${chg!==null?`<div style="font-size:12px;font-weight:600;margin-top:4px">${changeFmt(chg)} vs 周期A</div>`:''}
+    </div>`;
+  }).join('');
+
+  // Top movers (B vs A by ASIN)
+  const moverRows = tableRows_tmp();
+  const gainBA = [...moverRows].filter(r=>r.chgBA!==null&&r.pd[0].sales>0).sort((a,b)=>b.chgBA-a.chgBA).slice(0,5);
+  const lossBA = [...moverRows].filter(r=>r.chgBA!==null&&r.pd[0].sales>0).sort((a,b)=>a.chgBA-b.chgBA).slice(0,5);
+  document.getElementById('moverGainBA').innerHTML = gainBA.map(r=>`
+    <div class="mover-item"><span>${r.v.model} (${r.v.site})</span><span class="change-up">+${(r.chgBA*100).toFixed(0)}%</span></div>`).join('') || '<div style="color:var(--gray);font-size:12px">无数据</div>';
+  document.getElementById('moverLossBA').innerHTML = lossBA.map(r=>`
+    <div class="mover-item"><span>${r.v.model} (${r.v.site})</span><span class="change-down">${(r.chgBA*100).toFixed(0)}%</span></div>`).join('') || '<div style="color:var(--gray);font-size:12px">无数据</div>';
+
+  // Chart 1: daily avg sales bar by period
+  if (compareCharts['c1']) { compareCharts['c1'].destroy(); }
+  const ctx1 = document.getElementById('compareChart1').getContext('2d');
+  const allModels = [...new Set(entries.map(([,v])=>v.model||'?'))].sort();
+  const c1datasets = pResults.map((p,i) => ({
+    label: p.label,
+    data: allModels.map(m => {
+      let s=0, days=p.days||1;
+      for (const [key,v] of entries) {
+        if (v.model===m) s += (p.asinData[key]||{}).sales||0;
+      }
+      return +(s/days).toFixed(2);
+    }),
+    backgroundColor: p.color+'99',
+    borderColor: p.color,
+    borderWidth: 1, borderRadius:3
+  }));
+  compareCharts['c1'] = new Chart(ctx1, {
+    type:'bar',
+    data:{ labels:allModels, datasets:c1datasets },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{position:'top',labels:{font:{size:11},boxWidth:10}}},
+      scales:{x:{ticks:{font:{size:10}}},y:{beginAtZero:true,title:{display:true,text:'日均销量'},ticks:{font:{size:10}}}}
+    }
+  });
+
+  // Chart 2: GV + CR comparison
+  if (compareCharts['c2']) { compareCharts['c2'].destroy(); }
+  const ctx2 = document.getElementById('compareChart2').getContext('2d');
+  compareCharts['c2'] = new Chart(ctx2, {
+    type:'bar',
+    data:{
+      labels: pResults.map(p=>p.label),
+      datasets:[
+        { label:'日均GV', data:pResults.map(p=>+(p.totalGV/Math.max(p.days,1)).toFixed(0)), backgroundColor:PERIOD_COLORS.map(c=>c+'88'), borderColor:PERIOD_COLORS, borderWidth:2, borderRadius:4, yAxisID:'y' },
+        { type:'line', label:'CR%', data:pResults.map(p=>+(p.avgCR*100).toFixed(2)), borderColor:'#d97706', backgroundColor:'transparent', yAxisID:'y2', pointRadius:6, pointBorderWidth:2, tension:0 }
+      ]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{position:'top',labels:{font:{size:11},boxWidth:10}}},
+      scales:{
+        y:{beginAtZero:true,title:{display:true,text:'日均GV'},ticks:{font:{size:10}}},
+        y2:{position:'right',title:{display:true,text:'CR%'},grid:{drawOnChartArea:false},ticks:{callback:v=>v+'%',font:{size:10}}}
+      }
+    }
+  });
+
+  // Build table rows (shared between movers and table)
+  function tableRows_tmp() {
+    const rows = [];
+    for (const [key, v] of entries) {
+      const pd = pResults.map(p => p.asinData[key] || {sales:0,gv:0,cr:0});
+      const chgBA = pd[0].sales>0?(pd[1].sales-pd[0].sales)/pd[0].sales:null;
+      const chgCA = pd[0].sales>0?(pd[2].sales-pd[0].sales)/pd[0].sales:null;
+      rows.push({v, pd, chgBA, chgCA, totalSales:pd.reduce((a,p)=>a+p.sales,0)});
+    }
+    return rows.sort((a,b)=>b.totalSales-a.totalSales);
+  }
+
+  // Trend overlay chart (day-by-day across periods, aligned by day index)
+  if (compareCharts['c3']) { compareCharts['c3'].destroy(); }
+  const ctx3 = document.getElementById('compareChart3').getContext('2d');
+  const maxDays = Math.max(...pResults.map(p=>p.dates.length));
+  const dayLabels3 = Array.from({length:maxDays},(_,i)=>`D${i+1}`);
+  const c3datasets = pResults.map(p => {
+    const dailyTotals = p.dates.map(d => {
+      let s=0;
+      for(const [,v] of entries) s+=(v.sales||{})[d]||0;
+      return s;
+    });
+    return {label:`${p.label} (${p.start?.slice(5)}~${p.end?.slice(5)})`, data:dailyTotals,
+      borderColor:p.color, backgroundColor:'transparent', tension:.3, pointRadius:2, borderWidth:2};
+  });
+  compareCharts['c3'] = new Chart(ctx3, {
+    type:'line',
+    data:{labels:dayLabels3, datasets:c3datasets},
+    options:{responsive:true,maintainAspectRatio:false,
+      interaction:{mode:'index',intersect:false},
+      plugins:{legend:{position:'top',labels:{font:{size:11},boxWidth:10}}},
+      scales:{y:{beginAtZero:true,title:{display:true,text:'当日总销量'},ticks:{font:{size:10}}},
+              x:{ticks:{font:{size:10}}}}}
+  });
+
+  // Compare table
+  const thead = document.getElementById('compareTableHead');
+  const tbody = document.getElementById('compareTableBody');
+  thead.innerHTML = `<tr>
+    <th>品牌</th><th>型号</th><th>ASIN</th><th>站点</th>
+    ${pResults.map(p=>`<th class="num">销量(${p.label})</th><th class="num">GV(${p.label})</th><th class="num">CR(${p.label})</th>`).join('')}
+    <th>B vs A</th><th>C vs A</th>
+  </tr>`;
+
+  const tableRows = tableRows_tmp();
+
+  tbody.innerHTML = tableRows.map(r => {
+    const siteTag = `<span class="site-tag tag-${r.v.site||''}">${r.v.site||'?'}</span>`;
+    const pdCells = r.pd.map(p => `<td class="num">${numFmt(p.sales)}</td><td class="num">${numFmt(p.gv)}</td><td class="num">${pctFmt(p.cr)}</td>`).join('');
+    return `<tr>
+      <td>${r.v.brand||'—'}</td><td>${r.v.model||'—'}</td>
+      <td style="font-size:11px;color:var(--gray)">${r.v.asin||'—'}</td>
+      <td>${siteTag}</td>
+      ${pdCells}
+      <td class="num">${changeFmt(r.chgBA)}</td>
+      <td class="num">${changeFmt(r.chgCA)}</td>
+    </tr>`;
+  }).join('');
+
+  // Anomaly text
+  const anomalies = [];
+  for (const row of tableRows) {
+    if (row.chgBA !== null && Math.abs(row.chgBA) > 0.3) {
+      const dir = row.chgBA > 0 ? '增长' : '下降';
+      anomalies.push(`• <b>${row.v.model}</b>（${row.v.site}）周期B相比周期A销量${dir} ${Math.abs(row.chgBA*100).toFixed(0)}%`);
+    }
+    if (row.chgCA !== null && Math.abs(row.chgCA) > 0.3) {
+      const dir = row.chgCA > 0 ? '增长' : '下降';
+      anomalies.push(`• <b>${row.v.model}</b>（${row.v.site}）周期C相比周期A销量${dir} ${Math.abs(row.chgCA*100).toFixed(0)}%`);
+    }
+  }
+  document.getElementById('compareAnomalyText').innerHTML = anomalies.length
+    ? `<div style="line-height:2;font-size:13px">${anomalies.slice(0,20).join('<br>')}</div>`
+    : '<p style="color:var(--gray);font-size:13px">三个周期内各ASIN销量变化幅度均在30%以内，无显著异常。</p>';
+}
+
+// ==================== MANAGE TAB ====================
+function renderManageTab() {
+  const stored = localStorage.getItem(LS_KEY);
+  const storeSize = stored ? (stored.length/1024).toFixed(1) : '0';
+  document.getElementById('storageInfo').textContent = `本地存储占用: ${storeSize} KB`;
+
+  const rows = Object.values(appData).map(v => {
+    const salesDates = Object.keys(v.sales||{}).sort();
+    const gvDates = Object.keys(v.gv||{}).sort();
+    return { v, salesDates, gvDates };
+  }).sort((a,b)=>(a.v.brand+a.v.model).localeCompare(b.v.brand+b.v.model));
+
+  document.getElementById('manageBody').innerHTML = rows.map(r => `
+    <tr>
+      <td>${r.v.brand||'—'}</td>
+      <td>${r.v.model||'—'}</td>
+      <td style="font-size:11px;color:var(--gray)">${r.v.asin||'—'}</td>
+      <td><span class="site-tag tag-${r.v.site||''}">${r.v.site||'?'}</span></td>
+      <td class="num">${r.salesDates.length}</td>
+      <td class="num">${r.gvDates.length}</td>
+      <td>${r.salesDates[0]||'—'}</td>
+      <td>${r.salesDates.slice(-1)[0]||'—'}</td>
+    </tr>
+  `).join('');
+}
+
+// ==================== EXCEL UPLOAD ====================
+function handleUpload(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const wb = XLSX.read(e.target.result, { type:'array', cellDates:true });
+      const rawData = parseWorkbook(wb);
+
+      // Find the latest date across all parsed data
+      const allParsedDates = [...new Set(
+        Object.values(rawData).flatMap(v => [
+          ...Object.keys(v.sales||{}),
+          ...Object.keys(v.gv||{})
+        ])
+      )].filter(Boolean).sort();
+
+      if (!allParsedDates.length) throw new Error('未找到有效日期数据');
+
+      const latestDate = allParsedDates[allParsedDates.length - 1];
+      // Compute cutoff: 7 days back from latest date
+      const cutoffDate = new Date(latestDate);
+      cutoffDate.setDate(cutoffDate.getDate() - 6); // latestDate - 6 = 7 days window
+      const cutoffStr = cutoffDate.toISOString().slice(0, 10);
+
+      // Filter data to keep only dates within [cutoff, latestDate]
+      const newData = {};
+      for (const [key, v] of Object.entries(rawData)) {
+        const sales = Object.fromEntries(
+          Object.entries(v.sales||{}).filter(([d]) => d >= cutoffStr && d <= latestDate)
+        );
+        const gv = Object.fromEntries(
+          Object.entries(v.gv||{}).filter(([d]) => d >= cutoffStr && d <= latestDate)
+        );
+        if (Object.keys(sales).length || Object.keys(gv).length) {
+          newData[key] = { brand:v.brand, model:v.model, asin:v.asin, site:v.site, sales, gv };
+        }
+      }
+
+      const savedDates = [...new Set(
+        Object.values(newData).flatMap(v => Object.keys(v.sales||{}))
+      )].sort();
+
+      saveLocalData(newData);
+      loadData();
+      buildFilterUI();
+      applyFilters();
+      alert(`✅ 数据更新成功！\n更新日期范围（近7天）: ${cutoffStr} ~ ${latestDate}\n实际有数据天数: ${savedDates.length} 天\n涉及 ${Object.keys(newData).length} 个 ASIN×站点`);
+    } catch(err) {
+      alert('❌ 解析失败: ' + err.message);
+      console.error(err);
+    }
+    input.value = '';
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function parseWorkbook(wb) {
+  const result = {};
+
+  function parseSheet(ws, metric) {
+    const arr = XLSX.utils.sheet_to_json(ws, { header:1, defval:null, raw:false });
+    if (arr.length < 3) return;
+
+    // Row index 1 = dates
+    const dateRow = arr[1] || [];
+    const dates = [];
+    for (let i = 4; i < dateRow.length; i++) {
+      const cell = ws[XLSX.utils.encode_cell({r:1,c:i})];
+      if (!cell) { dates.push(null); continue; }
+      let d = null;
+      if (cell.t === 'd') d = fmtDate(cell.v);
+      else if (cell.t === 'n') d = fmtDate(cell.v);
+      else if (typeof cell.v === 'string') d = cell.v.slice(0,10);
+      dates.push(d);
+    }
+
+    let curBrand=null, curModel=null, curAsin=null;
+    for (let r = 2; r < arr.length; r++) {
+      const row = arr[r];
+      if (!row || row.every(v=>v==null)) continue;
+      if (row[0]) curBrand = row[0];
+      if (row[1]) curModel = row[1];
+      if (row[2]) curAsin = row[2];
+      let site = row[3] || 'US';
+      if (!curAsin) continue;
+
+      const key = `${curAsin}|${site}`;
+      if (!result[key]) result[key] = { brand:curBrand, model:curModel, asin:curAsin, site, sales:{}, gv:{} };
+
+      for (let c = 4; c < row.length; c++) {
+        const dateStr = dates[c-4];
+        const raw = row[c];
+        if (!dateStr || raw==null || raw==='') continue;
+        const val = parseFloat(raw);
+        if (!isNaN(val)) result[key][metric][dateStr] = val;
+      }
+    }
+  }
+
+  for (const name of wb.SheetNames) {
+    const ws = wb.Sheets[name];
+    if (name.includes('销量')||name.includes('销售')) parseSheet(ws,'sales');
+    else if (name.includes('流量')) parseSheet(ws,'gv');
+  }
+
+  return result;
+}
+
+// ==================== MISC ====================
+function switchTab(id, btn) {
+  document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('pane-'+id).classList.add('active');
+  btn.classList.add('active');
+}
+
+function clearLocalData() {
+  if (confirm('确定清除本地更新数据？初始数据不会受影响。')) {
+    localStorage.removeItem(LS_KEY);
+    loadData();
+    buildFilterUI();
+    applyFilters();
+    alert('已清除本地更新数据。');
+  }
+}
+
+function exportData() {
+  const blob = new Blob([JSON.stringify(appData, null, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `vc_monitor_data_${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+}
+
+// ==================== INIT ====================
+loadData();
+buildFilterUI();
+applyFilters();   // initial render with all filters cleared
+getDefaultPeriods();
+
+// Update last update info
+const allDates = getAllDates();
+if (allDates.length) {
+  document.getElementById('lastUpdateInfo').textContent = `最新数据: ${allDates[allDates.length-1]}`;
+}
+</script>
+</body>
+</html>
