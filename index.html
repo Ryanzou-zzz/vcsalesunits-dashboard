@@ -307,6 +307,14 @@ tr:hover td{background:#f9fafb}
       </div>
     </div>
   </div>
+  <!-- ASIN精准搜索 -->
+  <div class="filter-group">
+    <span class="filter-label">ASIN</span>
+    <input type="text" id="asinSearchInput" placeholder="精准搜索 ASIN..." oninput="markDirty()"
+      style="border:1px solid var(--border);border-radius:6px;padding:5px 10px;font-size:12px;color:#374151;outline:none;width:180px;transition:border .2s"
+      onfocus="this.style.borderColor='var(--blue)'" onblur="this.style.borderColor='var(--border)'"
+      onkeydown="if(event.key==='Enter')applyFilters()">
+  </div>
   <!-- 日期 -->
   <div class="filter-group">
     <span class="filter-label">日期范围</span>
@@ -545,7 +553,8 @@ let state = {
   sites: new Set(),
   asins: new Set(),
   dateStart: '',
-  dateEnd: ''
+  dateEnd: '',
+  asinKeyword: ''
 };
 let charts = {};
 let compareCharts = {};
@@ -621,11 +630,13 @@ function getAllDates() {
 }
 
 function getFilteredEntries() {
+  const asinKeyword = (state.asinKeyword||'').trim().toLowerCase();
   return Object.entries(appData).filter(([key, v]) => {
-    if (!isValidSite(v.site)) return false;           // exclude junk site values
+    if (!isValidSite(v.site)) return false;
     if (state.brands.size && !state.brands.has(v.brand)) return false;
     if (state.sites.size && !state.sites.has(v.site)) return false;
-    if (state.asins.size && !state.asins.has(v.model)) return false; // filter by model name
+    if (state.asins.size && !state.asins.has(v.model)) return false;
+    if (asinKeyword && !(v.asin||'').toLowerCase().includes(asinKeyword)) return false; // ASIN精准搜索
     return true;
   });
 }
@@ -826,6 +837,7 @@ function resetFilters() {
   document.getElementById('dateStart').value = '';
   document.getElementById('dateEnd').value = '';
   document.getElementById('modelSearch').value = '';
+  document.getElementById('asinSearchInput').value = '';
   clearQuickActive();
   buildFilterUI();
   document.getElementById('filterHint').classList.remove('show');
@@ -874,6 +886,7 @@ function applyFilters() {
   state.brands = new Set(pending.brands);
   state.sites  = new Set(pending.sites);
   state.asins  = new Set(pending.asins);
+  state.asinKeyword = (document.getElementById('asinSearchInput').value || '').trim();
   state.dateStart = document.getElementById('dateStart').value;
   state.dateEnd   = document.getElementById('dateEnd').value;
   document.getElementById('filterHint').classList.remove('show');
